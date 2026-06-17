@@ -79,11 +79,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Text style={styles.title}>Off Grid</Text>
+              <Text style={styles.title}>
+                <Text style={styles.titleAccent}>Off</Text>
+                {' Grid'}
+              </Text>
               {showIcon && <PulsatingIcon onPress={openSheet} />}
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('ProDetail')} hitSlop={8} style={styles.crownButton}>
-              <IconMC name="crown" size={16} color={colors.primary} />
+              <IconMC name="crown" size={16} color={colors.accent} />
             </TouchableOpacity>
           </View>
 
@@ -113,6 +116,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             (activeTextModel || activeImageModelId) ? (
               <Button
                 title="New Chat"
+                variant="gradient"
                 onPress={startNewChat}
                 style={styles.newChatButton}
                 testID="new-chat-button"

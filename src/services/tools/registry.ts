@@ -5,7 +5,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
     id: 'web_search',
     name: 'web_search',
     displayName: 'Web Search',
-    description: 'Search the live web and return real-time result titles, snippets, and URLs. Use this for any question about current events, prices, weather, news, or anything that requires up-to-date information. When the snippet is insufficient, call read_url on the most relevant result URL to get the full page content.',
+    description: 'Search the live web via Brave (brave.com) and return real-time result titles, snippets, and URLs. Search queries are sent to Brave\'s servers — no other user data is transmitted. Use this for any question about current events, prices, weather, news, or anything that requires up-to-date information. When the snippet is insufficient, call read_url on the most relevant result URL to get the full page content.',
     icon: 'globe',
     requiresNetwork: true,
     parameters: {

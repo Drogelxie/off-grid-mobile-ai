@@ -1,275 +1,153 @@
-# OffgridMobile Visual Hierarchy Standard
+# OffgridMobile Visual Hierarchy Standard (Aurora)
 
 ## Purpose
 
-This document defines the canonical visual hierarchy for ALL screens in OffgridMobile. Use these 5 text categories to maintain consistent information architecture across the entire app.
+This document defines the canonical visual hierarchy for ALL screens in OffgridMobile. The Aurora design system uses a vibrant multi-color palette, expressive typography with stronger weights, and playful use of gradients to create an engaging and intuitive experience.
+
+---
+
+## Aurora Color System
+
+The palette has four accent colors, each with semantic meaning:
+
+| Token | Color | Hex | Role |
+|---|---|---|---|
+| `colors.primary` | Violet | `#A78BFA` / `#7C3AED` | Primary actions, headings, focus states |
+| `colors.secondary` | Emerald | `#34D399` / `#10B981` | Success, nature, image-generation |
+| `colors.accent` | Amber | `#FBBF24` / `#F59E0B` | Energy, trending, premium/pro |
+| `colors.info` | Cyan | `#38BDF8` / `#0EA5E9` | Data, AI indicators, links |
+
+Background shades shift from deep navy (`#0D0D1A`) through midnight (`#1A1A2E`) to dark indigo (`#252547`), giving depth without pure black.
+
+Gradients live in `GRADIENTS` (exported from `src/theme/palettes.ts`) and should be applied via `react-native-linear-gradient`.
 
 ---
 
 ## The 5 Text Categories
 
 ### 1. **TITLE** - Screen/Page Titles
-**Purpose**: Top-level screen identification. The first thing users see.
 
-**Typography Token**: `TYPOGRAPHY.h2`
-**Size**: 16px
-**Weight**: 400
-**Color**: `COLORS.text` (#FFFFFF)
-**Letter Spacing**: -0.2
-**Transform**: Normal case (not uppercase)
+**Typography Token**: `TYPOGRAPHY.h1`  
+**Size**: 26px  
+**Weight**: 600  
+**Color**: `colors.text`  
+**Letter Spacing**: -0.8  
 
 **Usage**:
-- Main screen titles in headers
-- Primary identification of current location
+- Main screen titles, hero headings
+- Accent color (`colors.primary`) may be applied to a word/prefix for visual pop
 - ONE per screen maximum
 
 **Examples**:
+- `<Text style={{color: colors.primary}}>Off</Text> Grid`
 - "Models"
 - "Conversations"
-- "Off Grid"
-- "Download Your First Model"
-
-**Do NOT use for**:
-- Section headers within a screen (use SUBTITLE)
-- Modal titles (use SUBTITLE)
-- Hero text or large numbers (use display styles)
 
 ---
 
 ### 2. **SUBTITLE** - Section Headers & Modal Titles
-**Purpose**: Secondary hierarchy. Organizes content into sections.
 
-**Typography Token**: `TYPOGRAPHY.h3`
-**Size**: 13px
-**Weight**: 400
-**Color**: `COLORS.text` (#FFFFFF) or `COLORS.textSecondary` (#B0B0B0)
-**Letter Spacing**: -0.2
+**Typography Token**: `TYPOGRAPHY.h3`  
+**Size**: 14px  
+**Weight**: 500  
+**Color**: `colors.text` or `colors.textSecondary`  
 
 **Usage**:
 - Section headers within a screen
 - Modal/dialog titles
-- Card titles
-- Grouping labels (when not uppercase labels)
-
-**Examples**:
-- "Recommended Models"
-- "Recent Conversations"
-- "Downloaded Models"
-- "Privacy Settings"
-
-**Do NOT use for**:
-- Main screen titles (use TITLE)
-- Tiny uppercase labels (use LABEL)
+- Card headings with actions
 
 ---
 
-### 3. **DESCRIPTION** - Explanatory Secondary Text
-**Purpose**: Provides context, instructions, or secondary information about an element.
+### 3. **DESCRIPTION** - Explanatory Text
 
-**Typography Token**: `TYPOGRAPHY.bodySmall`
-**Size**: 13px
-**Weight**: 400
-**Color**: `COLORS.textSecondary` (#B0B0B0)
-**Line Height**: 18-20px
+**Typography Token**: `TYPOGRAPHY.bodySmall`  
+**Size**: 13px  
+**Weight**: 400  
+**Color**: `colors.textSecondary`  
+**Line height**: 20
 
 **Usage**:
-- Explanatory text below titles
-- Help text and instructions
-- Empty state messages (secondary line)
-- Placeholder descriptions
-- Feature explanations
-
-**Examples**:
-- "Based on your device (7.8GB RAM), we recommend these models..."
-- "All conversations stay on your device"
-- "Select from various AI models. Smaller models are faster..."
-- "Enter your passphrase to unlock"
-
-**Do NOT use for**:
-- Main content/messages (use BODY)
-- Tiny metadata (use META)
+- Help text, empty states, value propositions
+- Paragraphs under a title
 
 ---
 
-### 4. **BODY** - Primary Content Text
-**Purpose**: The main readable content. Default text size for most interactions.
+### 4. **BODY** - Main Content
 
-**Typography Token**: `TYPOGRAPHY.body`
-**Size**: 14px
-**Weight**: 400
-**Color**: `COLORS.text` (#FFFFFF) or `COLORS.textSecondary` (#B0B0B0)
-**Line Height**: 20px
+**Typography Token**: `TYPOGRAPHY.body`  
+**Size**: 15px  
+**Weight**: 400  
+**Color**: `colors.text`  
+**Line height**: 22
 
 **Usage**:
 - Chat messages
 - Form inputs
-- Button labels
-- List item primary text
-- Main content paragraphs
-- Settings options
-- Default text when unsure
-
-**Examples**:
-- Message content in chat
-- "Select a model to start chatting"
-- Button text like "Download", "New Chat"
-- Setting descriptions
-- Input field content
-
-**Do NOT use for**:
-- Tiny metadata/timestamps (use META)
-- Uppercase labels (use LABEL)
-- Large screen titles (use TITLE)
+- Button labels (weight 500)
+- List item names
 
 ---
 
-### 5. **META** - Metadata & Timestamps
-**Purpose**: Tiny supporting information. Should "whisper, not shout."
+### 5. **META** - Metadata
 
-**Typography Token**: `TYPOGRAPHY.meta` or `TYPOGRAPHY.label` (uppercase)
-**Size**: 10px (meta) or 9px (metaSmall)
-**Weight**: 300 (meta) or 400 (label)
-**Color**: `COLORS.textMuted` (#808080)
-**Letter Spacing**: +0.3 (for labels)
-**Transform**: UPPERCASE (for labels only)
+**Typography Token**: `TYPOGRAPHY.meta` / `TYPOGRAPHY.label`  
+**Size**: 10–11px  
+**Weight**: 400–500  
+**Color**: `colors.textMuted`  
+**Letter Spacing**: 0.6–1.0 for labels (uppercase)
 
 **Usage**:
-- Timestamps ("2h ago", "Yesterday")
-- File sizes ("395.95 MB")
-- Performance metrics ("12.3 tok/s")
-- Technical details ("Q4_K_M", "Metal", "99 layers")
-- Uppercase section labels ("ACTIVE MODEL", "DOWNLOADED MODELS")
-- Badge text
-- Tiny supporting info
-
-**Examples**:
-- "12 messages · 2h ago"
-- "Q2_K • 395 MB • Low"
-- "LOADED MODELS" (label, uppercase)
-- "~4.2 GB RAM"
-- "Available Memory"
-
-**Do NOT use for**:
-- Regular body text (use BODY)
-- Descriptions (use DESCRIPTION)
+- Timestamps, file sizes, model params
+- Uppercase category chips/tags
 
 ---
 
-## Visual Hierarchy Rules
+## Gradient Usage Rules
 
-### Size Hierarchy (Largest → Smallest)
-1. **TITLE** (16px) - Screen titles
-2. **BODY** (14px) - Main content
-3. **SUBTITLE** (13px) - Section headers
-4. **DESCRIPTION** (13px) - Explanatory text
-5. **META** (10px) - Tiny metadata
+| Context | Gradient | Token |
+|---|---|---|
+| Primary CTA button | violet → indigo | `GRADIENTS.primary` |
+| Hero sections / onboarding | violet → cyan → emerald | `GRADIENTS.aurora` |
+| Alerts / warnings | amber → red | `GRADIENTS.warm` |
+| Image-gen context | emerald → teal | `GRADIENTS.nature` |
+| Active card accent bar | solid `colors.primary` or `colors.secondary` | — |
 
-### Color Hierarchy (Most Prominent → Least)
-1. **Primary**: `COLORS.text` (#FFFFFF) - Titles, body, important info
-2. **Secondary**: `COLORS.textSecondary` (#B0B0B0) - Descriptions, less important
-3. **Muted**: `COLORS.textMuted` (#808080) - Metadata, whispers
-
-### Weight Hierarchy
-- **All weights 200-400** (never bold/600+)
-- **Title/Body**: 400 (normal)
-- **Meta**: 300 (light)
-- **Display**: 200 (extra light, for large numbers)
+Never use gradients on body text. Gradient text is reserved for large display headings only, and only when the background provides enough contrast.
 
 ---
 
-## Decision Tree: "What Typography Should I Use?"
+## Card & Component Rules
 
-```
-Is this the main screen title shown in the header?
-├─ YES → TITLE (h2, 16px)
-└─ NO ↓
-
-Is this a section header, modal title, or card title?
-├─ YES → SUBTITLE (h3, 13px)
-└─ NO ↓
-
-Is this explaining/describing something above it?
-├─ YES → DESCRIPTION (bodySmall, 13px, muted)
-└─ NO ↓
-
-Is this main content, a message, input, or button?
-├─ YES → BODY (body, 14px)
-└─ NO ↓
-
-Is this tiny supporting info, timestamp, or file size?
-└─ YES → META (meta/label, 10px, muted)
-```
+| Property | Value |
+|---|---|
+| Card border radius | 16px (standard), 14px (compact) |
+| Button border radius | 12px |
+| Sheet border radius | 20–24px |
+| Card border | 1px `colors.border` at rest; 1.5px `colors.primary` when active |
+| Active card indicator | 3px top bar in the accent color for that category |
+| Shadow | `shadows.small` (default), `shadows.glow` for focus/active |
 
 ---
 
-## Common Mistakes to Avoid
+## Icon Rules
 
-❌ **Using h1 (24px) for screen titles** → Use h2 (16px) instead
-❌ **Using body (14px) for metadata** → Use meta (10px) instead
-❌ **Hardcoded font sizes** → Always use TYPOGRAPHY tokens
-❌ **Mixing sizes within same category** → Be consistent
-❌ **Using color for hierarchy alone** → Use size + color together
-❌ **Bold weights (600+)** → Keep weights ≤400 for brutalist aesthetic
-❌ **Emojis or emoticons ANYWHERE** → NEVER use emojis or emoticons in UI text, code, or messages. Use react-native-vector-icons (Feather) for icons.
-❌ **Magic numbers for spacing** → Use SPACING tokens
+- Use `react-native-vector-icons/Feather` by default
+- Use `MaterialCommunityIcons` only when Feather lacks a suitable icon (e.g. `crown`, `whatshot`)
+- Icon size: 16px (body), 14px (meta), 20px (action)
+- Icon color: matches the text hierarchy level at that position, or uses the semantic accent color (e.g. amber for premium crown icon)
+- No emojis in UI text
 
 ---
 
-## Screen Anatomy Example
+## What Changed from the Brutalist System
 
-```
-┌─────────────────────────────────────┐
-│ [TITLE: Models]                     │ ← h2 (16px)
-├─────────────────────────────────────┤
-│                                     │
-│ ACTIVE MODEL                        │ ← META/LABEL (10px, uppercase)
-│ SmolLM2-135M                       │ ← BODY (14px)
-│ Q2_K • 395 MB                      │ ← META (10px)
-│                                     │
-│ [SUBTITLE: Downloaded Models]       │ ← h3 (13px)
-│                                     │
-│ Qwen 2.5 0.5B                      │ ← BODY (14px)
-│ Tiny but capable model...          │ ← DESCRIPTION (13px, muted)
-│ 395.95 MB • Q4_K_M • Low           │ ← META (10px)
-│                                     │
-└─────────────────────────────────────┘
-```
-
----
-
-## Reference: TYPOGRAPHY Tokens
-
-| Token | Size | Weight | Use |
-|-------|------|--------|-----|
-| `display` | 22px | 200 | Large numbers (RAM, stats) |
-| `h1` | 24px | 300 | **DEPRECATED for screens** - reserved for hero text |
-| `h2` | 16px | 400 | **TITLE** - Screen titles |
-| `h3` | 13px | 400 | **SUBTITLE** - Section headers |
-| `body` | 14px | 400 | **BODY** - Main content |
-| `bodySmall` | 13px | 400 | **DESCRIPTION** - Explanatory text |
-| `label` | 10px | 400 | **META** - Uppercase labels |
-| `labelSmall` | 9px | 400 | **META** - Tiny labels |
-| `meta` | 10px | 300 | **META** - Metadata, timestamps |
-| `metaSmall` | 9px | 300 | **META** - Tiny metadata |
-
----
-
-## Enforcement Checklist
-
-When creating or auditing a screen:
-
-- [ ] Screen title uses `TYPOGRAPHY.h2` (TITLE)
-- [ ] Section headers use `TYPOGRAPHY.h3` (SUBTITLE)
-- [ ] Explanatory text uses `TYPOGRAPHY.bodySmall` (DESCRIPTION)
-- [ ] Main content uses `TYPOGRAPHY.body` (BODY)
-- [ ] Timestamps/metadata use `TYPOGRAPHY.meta` or `TYPOGRAPHY.label` (META)
-- [ ] No hardcoded font sizes
-- [ ] No weights > 400
-- [ ] NEVER use emojis or emoticons anywhere (use Feather icons instead)
-- [ ] Spacing uses SPACING tokens
-- [ ] Colors follow hierarchy (text → textSecondary → textMuted)
-
----
-
-**Last Updated**: February 2026
-**Authority**: This document is the single source of truth for typography in OffgridMobile.
+| Old | New |
+|---|---|
+| Single emerald accent | Four accent colors (violet, emerald, amber, cyan) |
+| Pure black `#0A0A0A` background | Deep navy `#0D0D1A` background |
+| Weights ≤ 400 | Weights up to 600 for titles/CTAs |
+| No gradients | Gradients for buttons, onboarding, hero sections |
+| 8px border radius | 12–16px border radius |
+| Font sizes: 16/13/14/10 | Font sizes: 26/14/15/11 |
+| Transparent primary buttons | Filled/gradient primary buttons |

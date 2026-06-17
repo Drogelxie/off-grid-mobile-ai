@@ -246,4 +246,67 @@ describe('AuthService', () => {
       expect(Keychain.setGenericPassword).toHaveBeenCalledTimes(1);
     });
   });
+
+  // ========================================================================
+  // Legacy hash migration
+  // ========================================================================
+  describe('legacy hash migration', () => {
+    it('accepts a v1 hash and migrates to v2 on successful verify', async () => {
+      // Compute a v1 (legacy) hash exactly as the old algorithm did
+      function legacyHash(passphrase: string): string {
+        let hash = 0;
+        for (let i = 0; i < passphrase.length; i++) {
+          const char = passphrase.codePointAt(i) ?? 0;
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash;
+        }
+        const baseHash = Math.abs(hash).toString(16);
+        let extendedHash = baseHash;
+        for (let i = 0; i < 1000; i++) {
+          let tempHash = 0;
+          for (let j = 0; j < extendedHash.length; j++) {
+            const char = extendedHash.codePointAt(j) ?? 0;
+            tempHash = ((tempHash << 5) - tempHash) + char;
+            tempHash = tempHash & tempHash;
+          }
+          extendedHash = Math.abs(tempHash).toString(16) + extendedHash.slice(0, 8);
+        }
+        return extendedHash;
+      }
+
+      const passphrase = 'myOldPassphrase';
+      const v1Hash = legacyHash(passphrase);
+
+      // Simulate a v1 hash stored in keychain (no "v2:" prefix)
+      (Keychain.getGenericPassword as jest.Mock).mockResolvedValue({
+        username: 'passphrase_hash',
+        password: v1Hash,
+        service: 'ai.offgridmobile.auth',
+      });
+      (Keychain.setGenericPassword as jest.Mock).mockResolvedValue(true);
+
+      const result = await authService.verifyPassphrase(passphrase);
+
+      expect(result).toBe(true);
+      // Migration: setGenericPassword should be called to upgrade to v2
+      expect(Keychain.setGenericPassword).toHaveBeenCalledTimes(1);
+      const storedHash = (Keychain.setGenericPassword as jest.Mock).mock.calls[0][1] as string;
+      expect(storedHash).toMatch(/^v2:/);
+    });
+
+    it('rejects a v1 hash with wrong passphrase without migrating', async () => {
+      const v1Hash = '0badcafe'; // arbitrary non-v2 hash
+
+      (Keychain.getGenericPassword as jest.Mock).mockResolvedValue({
+        username: 'passphrase_hash',
+        password: v1Hash,
+        service: 'ai.offgridmobile.auth',
+      });
+
+      const result = await authService.verifyPassphrase('wrongPassphrase');
+
+      expect(result).toBe(false);
+      expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
+    });
+  });
 });

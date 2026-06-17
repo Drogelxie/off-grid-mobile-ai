@@ -1,5 +1,6 @@
 import type { ThemeColors, ThemeShadows } from '../../theme';
 import { TYPOGRAPHY, SPACING } from '../../constants';
+
 const createLayoutStyles = (colors: ThemeColors) => ({
   container: {
     flex: 1,
@@ -10,57 +11,95 @@ const createLayoutStyles = (colors: ThemeColors) => ({
   },
   content: {
     padding: 20,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    marginBottom: 20,
+    marginBottom: 24,
+    paddingTop: 4,
   },
   headerLeft: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: 8,
+    gap: 10,
   },
   crownButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+    backgroundColor: `${colors.accent}18`,
   },
   title: {
-    ...TYPOGRAPHY.h2,
+    ...TYPOGRAPHY.h1,
     color: colors.text,
+    letterSpacing: -1,
+  },
+  titleAccent: {
+    color: colors.primary,
   },
 });
+
 const createModelCardStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   modelsRow: {
     flexDirection: 'row' as const,
-    gap: 16,
+    gap: 12,
     marginBottom: 20,
   },
   modelCard: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.small,
+  },
+  modelCardTextActive: {
+    borderColor: colors.primary,
+    borderWidth: 1.5,
+  },
+  modelCardImageActive: {
+    borderColor: colors.secondary,
+    borderWidth: 1.5,
+  },
+  modelCardAccentBar: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    backgroundColor: colors.primary,
+  },
+  modelCardAccentBarImage: {
+    backgroundColor: colors.secondary,
   },
   modelCardHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: 6,
     marginBottom: 8,
+    marginTop: 8,
   },
   modelCardLabel: {
     ...TYPOGRAPHY.labelSmall,
     flex: 1,
     color: colors.textMuted,
     textTransform: 'uppercase' as const,
+    letterSpacing: 1,
+  },
+  modelCardLabelActive: {
+    color: colors.primary,
+  },
+  modelCardLabelImageActive: {
+    color: colors.secondary,
   },
   modelCardName: {
     ...TYPOGRAPHY.h3,
@@ -73,10 +112,15 @@ const createModelCardStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
     gap: 6,
   },
   remoteBadge: {
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 4,
-    paddingHorizontal: 4,
+    backgroundColor: `${colors.info}20`,
+    borderRadius: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
+  },
+  remoteBadgeText: {
+    ...TYPOGRAPHY.metaSmall,
+    color: colors.info,
+    letterSpacing: 0.3,
   },
   modelCardMeta: {
     ...TYPOGRAPHY.meta,
@@ -97,31 +141,33 @@ const createModelCardStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     gap: 8,
-    paddingVertical: 12,
+    paddingVertical: 13,
     marginBottom: 20,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: `${colors.error}40`,
+    backgroundColor: `${colors.error}08`,
   },
   ejectAllText: {
-    fontSize: 14,
+    ...TYPOGRAPHY.body,
     color: colors.error,
-    fontWeight: '500' as const,
   },
   newChatButton: {
     marginBottom: 20,
   },
 });
+
 const createSectionStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   galleryCard: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 20,
     gap: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.small,
   },
   galleryCardInfo: {
@@ -164,19 +210,26 @@ const createSectionStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   sectionTitle: {
     ...TYPOGRAPHY.h3,
     color: colors.text,
+    fontWeight: '600' as const,
+    letterSpacing: 0.2,
+  },
+  sectionTitleDot: {
+    color: colors.primary,
   },
   seeAll: {
     ...TYPOGRAPHY.meta,
-    color: colors.textMuted,
+    color: colors.primary,
   },
   conversationItem: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: colors.surface,
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm + 2,
+    paddingVertical: SPACING.sm + 4,
     marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.small,
   },
   conversationInfo: {
@@ -192,6 +245,7 @@ const createSectionStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
     color: colors.text,
     flex: 1,
     marginRight: SPACING.sm,
+    fontWeight: '500' as const,
   },
   conversationMeta: {
     ...TYPOGRAPHY.metaSmall,
@@ -200,22 +254,24 @@ const createSectionStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   conversationPreview: {
     ...TYPOGRAPHY.meta,
     color: colors.textSecondary,
-    marginTop: 1,
+    marginTop: 2,
   },
   deleteAction: {
     backgroundColor: colors.errorBackground,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
-    width: 44,
-    borderRadius: 10,
+    width: 48,
+    borderRadius: 14,
     marginBottom: SPACING.md,
     marginLeft: SPACING.sm,
   },
   statsRow: {
     flexDirection: 'row' as const,
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.small,
   },
   statItem: {
@@ -224,13 +280,15 @@ const createSectionStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   },
   statValue: {
     ...TYPOGRAPHY.display,
-    color: colors.text,
+    color: colors.primary,
+    letterSpacing: -1.5,
   },
   statLabel: {
     ...TYPOGRAPHY.labelSmall,
     color: colors.textMuted,
     marginTop: SPACING.xs,
     textTransform: 'uppercase' as const,
+    letterSpacing: 1,
   },
   statDivider: {
     width: 1,
@@ -240,6 +298,7 @@ const createSectionStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
     overflow: 'visible' as const,
   },
 });
+
 const createPickerStyles = (colors: ThemeColors) => ({
   modalOverlay: {
     flex: 1,
@@ -248,8 +307,8 @@ const createPickerStyles = (colors: ThemeColors) => ({
   },
   modalContent: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: '70%' as const,
   },
   modalHeader: {
@@ -271,12 +330,15 @@ const createPickerStyles = (colors: ThemeColors) => ({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: colors.surface,
-    borderRadius: 10,
+    borderRadius: 14,
     padding: 14,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   pickerItemActive: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: `${colors.primary}15`,
+    borderColor: colors.primary,
   },
   pickerItemInfo: {
     flex: 1,
@@ -310,9 +372,9 @@ const createPickerStyles = (colors: ThemeColors) => ({
     justifyContent: 'center' as const,
     padding: 12,
     marginBottom: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: `${colors.error}40`,
     gap: 8,
   },
   unloadButtonText: {
@@ -332,6 +394,7 @@ const createPickerStyles = (colors: ThemeColors) => ({
     ...TYPOGRAPHY.labelSmall,
     color: colors.textMuted,
     textTransform: 'uppercase' as const,
+    letterSpacing: 1,
     marginTop: 12,
     marginBottom: 8,
   },
@@ -346,9 +409,10 @@ const createPickerStyles = (colors: ThemeColors) => ({
   },
   browseMoreText: {
     ...TYPOGRAPHY.body,
-    color: colors.textMuted,
+    color: colors.primary,
   },
 });
+
 export const createStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   ...createLayoutStyles(colors),
   ...createModelCardStyles(colors, shadows),

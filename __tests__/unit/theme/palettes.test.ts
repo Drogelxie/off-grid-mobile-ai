@@ -3,13 +3,13 @@
  *
  * Tests for createElevation factory function:
  * - Returns correct structure for all elevation levels
- * - blurType ternary: 'dark' when background === '#0A0A0A', 'light' otherwise
+ * - blurType ternary: 'dark' when background === '#0D0D1A' (Aurora dark), 'light' otherwise
  */
 
 import { createElevation, COLORS_DARK, COLORS_LIGHT } from '../../../src/theme/palettes';
 
 describe('createElevation', () => {
-  describe('with dark colors (background === "#0A0A0A")', () => {
+  describe('with dark colors (background === "#0D0D1A")', () => {
     const elevation = createElevation(COLORS_DARK);
 
     it('level3 blur blurType is "dark"', () => {
@@ -29,7 +29,7 @@ describe('createElevation', () => {
     });
   });
 
-  describe('with light colors (background !== "#0A0A0A")', () => {
+  describe('with light colors (background !== "#0D0D1A")', () => {
     const elevation = createElevation(COLORS_LIGHT);
 
     it('level3 blur blurType is "light"', () => {
@@ -42,8 +42,8 @@ describe('createElevation', () => {
   });
 
   describe('with custom dark background', () => {
-    it('returns "dark" blurType for any color with background === "#0A0A0A"', () => {
-      const customDarkColors = { ...COLORS_LIGHT, background: '#0A0A0A' };
+    it('returns "dark" blurType for any color with background === "#0D0D1A"', () => {
+      const customDarkColors = { ...COLORS_LIGHT, background: '#0D0D1A' };
       const elevation = createElevation(customDarkColors as any);
       expect(elevation.level3.blur.ios.blurType).toBe('dark');
       expect(elevation.level4.blur.ios.blurType).toBe('dark');
