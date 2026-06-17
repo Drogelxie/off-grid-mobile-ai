@@ -253,6 +253,7 @@ describe('AuthService', () => {
   describe('legacy hash migration', () => {
     it('accepts a v1 hash and migrates to v2 on successful verify', async () => {
       // Compute a v1 (legacy) hash exactly as the old algorithm did
+      /* eslint-disable no-bitwise */
       function legacyHash(passphrase: string): string {
         let hash = 0;
         for (let i = 0; i < passphrase.length; i++) {
@@ -273,6 +274,7 @@ describe('AuthService', () => {
         }
         return extendedHash;
       }
+      /* eslint-enable no-bitwise */
 
       const passphrase = 'myOldPassphrase';
       const v1Hash = legacyHash(passphrase);

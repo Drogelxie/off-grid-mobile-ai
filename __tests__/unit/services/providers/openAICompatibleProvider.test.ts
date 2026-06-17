@@ -194,7 +194,7 @@ describe('OpenAICompatibleProvider', () => {
     });
 
     it('should call onError when endpoint is on public internet', async () => {
-      const { isPrivateNetworkEndpoint } = httpClient as { isPrivateNetworkEndpoint: jest.Mock };
+      const { isPrivateNetworkEndpoint } = httpClient as unknown as { isPrivateNetworkEndpoint: jest.Mock };
       isPrivateNetworkEndpoint.mockReturnValueOnce(false);
 
       const publicProvider = new OpenAICompatibleProvider('public', {
