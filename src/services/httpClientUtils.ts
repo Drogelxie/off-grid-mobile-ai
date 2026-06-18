@@ -102,6 +102,15 @@ export function isPrivateNetworkEndpoint(endpoint: string): boolean {
       return true;
     }
 
+    // 100.64.0.0 - 100.127.255.255 (CGNAT / Tailscale VPN range)
+    const cgnatMatch = /^100\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(hostname);
+    if (cgnatMatch) {
+      const second = Number.parseInt(cgnatMatch[1], 10);
+      if (second >= 64 && second <= 127) {
+        return true;
+      }
+    }
+
     // .local (mDNS/Bonjour)
     if (hostname.endsWith('.local')) {
       return true;
