@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Keyboard, KeyboardAvoidingView, InteractionManager, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -26,7 +25,6 @@ function countConversationImages(conv: Conversation | undefined): number {
     n + (m.attachments?.filter((a) => a.type === 'image').length || 0), 0);
 }
 export const ChatScreen: React.FC = () => {
-  const { t } = useTranslation();
   const flatListRef = React.useRef<FlatList>(null);
   const isNearBottomRef = React.useRef(true);
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();

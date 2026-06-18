@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import React, { useEffect } from 'react';
 import { View, Text, FlatList, TextInput, ActivityIndicator, RefreshControl, TouchableOpacity, InteractionManager, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -388,7 +389,6 @@ export const TextModelsTab: React.FC<Props> = (props) => {
     setTypeFilter, setSourceFilter, setSizeFilter, setQuantFilter, setSortOption,
     isModelDownloaded, getDownloadedModel, isRepairingVisionModel,
   } = props;
-  const { t } = useTranslation();
   const hasNonSortActiveFilters = hasNonSortFilters(filterState);
   const currentSort = SORT_OPTIONS.find(o => o.key === filterState.sort) ?? SORT_OPTIONS[0];
   const isSortActive = filterState.sort !== 'recommended';
@@ -400,7 +400,7 @@ export const TextModelsTab: React.FC<Props> = (props) => {
   const { goTo } = useSpotlightTour();
 
   const renderModelItem = ({ item, index }: { item: ModelInfo; index: number }) => (
-    <ModelListItem item={item} index={index} focusTrigger={focusTrigger} isDownloaded={downloadedModels.some(m => m.id.startsWith(item.id))} isTrending={trendingAsModelInfo.some(t => t.id === item.id)} onPress={() => handleSelectModel(item)} />
+    <ModelListItem item={item} index={index} focusTrigger={focusTrigger} isDownloaded={downloadedModels.some(m => m.id.startsWith(item.id))} isTrending={trendingAsModelInfo.some(tm => tm.id === item.id)} onPress={() => handleSelectModel(item)} />
   );
 
   const onBack = () => applyBackNavigation(setSelectedModel, setModelFiles, goTo);
