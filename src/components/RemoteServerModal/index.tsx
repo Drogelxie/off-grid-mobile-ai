@@ -57,6 +57,40 @@ const TestResultSection: React.FC<TestResultSectionProps> = ({ testResult, disco
   </>
 );
 
+const EndpointHelpPanel: React.FC<{ styles: ReturnType<typeof createStyles> }> = ({ styles }) => {
+  const theme = useTheme();
+  return (
+    <View style={styles.helpPanel}>
+      <View style={styles.helpScenario}>
+        <View style={styles.helpScenarioHeader}>
+          <Icon name="wifi" size={13} color={theme.colors.secondary} />
+          <Text style={styles.helpScenarioTitle}>Same WiFi network</Text>
+        </View>
+        <Text style={styles.helpStep}>1. Find your PC's local IP address:</Text>
+        <Text style={styles.helpStep}>{'   '}Windows: open Command Prompt, run <Text style={styles.helpCode}>ipconfig</Text> - look for IPv4 Address</Text>
+        <Text style={styles.helpStep}>{'   '}Mac / Linux: run <Text style={styles.helpCode}>ip addr</Text> or <Text style={styles.helpCode}>ifconfig</Text></Text>
+        <Text style={styles.helpStep}>2. Use that IP with the server port:</Text>
+        <Text style={styles.helpStep}>{'   '}Ollama: <Text style={styles.helpCode}>http://192.168.1.X:11434</Text></Text>
+        <Text style={styles.helpStep}>{'   '}LM Studio: <Text style={styles.helpCode}>http://192.168.1.X:1234</Text></Text>
+      </View>
+
+      <View style={styles.helpDivider} />
+
+      <View style={styles.helpScenario}>
+        <View style={styles.helpScenarioHeader}>
+          <Icon name="shield" size={13} color={theme.colors.info} />
+          <Text style={styles.helpScenarioTitle}>Outside your home - secure with Tailscale</Text>
+        </View>
+        <Text style={styles.helpStep}>1. Install Tailscale on your PC and this phone (tailscale.com - free)</Text>
+        <Text style={styles.helpStep}>2. Sign in with the same account on both devices</Text>
+        <Text style={styles.helpStep}>3. Your PC gets a Tailscale IP starting with <Text style={styles.helpCode}>100.</Text></Text>
+        <Text style={styles.helpStep}>4. Use that IP here: <Text style={styles.helpCode}>http://100.X.X.X:11434</Text></Text>
+        <Text style={styles.helpStep}>{'   '}Connection is encrypted via WireGuard. No port forwarding needed.</Text>
+      </View>
+    </View>
+  );
+};
+
 export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
   visible,
   onClose,
@@ -67,6 +101,7 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
   const styles = useThemedStyles(createStyles);
 
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showEndpointHelp, setShowEndpointHelp] = useState(false);
 
   const {
     name, setName,
@@ -138,6 +173,20 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
             ? `Will connect to: ${endpoint.trim().replace(/\/+$/, '')}/v1/models`
             : 'Enter the base URL — /v1/models will be appended automatically'}
         </Text>
+        <TouchableOpacity
+          style={styles.helpToggle}
+          onPress={() => setShowEndpointHelp(v => !v)}
+        >
+          <Icon
+            name={showEndpointHelp ? 'chevron-up' : 'chevron-down'}
+            size={12}
+            color={theme.colors.primary}
+          />
+          <Text style={styles.helpToggleText}>
+            {showEndpointHelp ? 'Hide setup help' : 'How do I find the address?'}
+          </Text>
+        </TouchableOpacity>
+        {showEndpointHelp && <EndpointHelpPanel styles={styles} />}
 
         <Text style={styles.label}>API Key (Optional)</Text>
         <View style={styles.apiKeyContainer}>
@@ -156,7 +205,7 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
           </TouchableOpacity>
         </View>
         <Text style={styles.helperText}>
-          Required for cloud APIs (Groq, OpenAI, OpenRouter, etc.)
+          Stored in the device keychain. Required for some servers - check your server's settings.
         </Text>
 
         <Text style={styles.label}>Notes (Optional)</Text>

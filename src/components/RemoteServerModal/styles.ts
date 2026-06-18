@@ -157,5 +157,52 @@ export function createStyles(colors: ThemeColors, _shadows: ThemeShadows) {
       backgroundColor: colors.surfaceLight,
       borderRadius: 12,
     },
+    helpToggle: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: 4,
+      marginTop: 8,
+      alignSelf: 'flex-start' as const,
+    },
+    helpToggleText: {
+      fontSize: 12,
+      color: colors.primary,
+    },
+    helpPanel: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginTop: 8,
+      gap: 12,
+    },
+    helpScenario: {
+      gap: 4,
+    },
+    helpScenarioHeader: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: 6,
+      marginBottom: 4,
+    },
+    helpScenarioTitle: {
+      fontSize: 13,
+      fontWeight: '600' as const,
+      color: colors.text,
+    },
+    helpStep: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      lineHeight: 18,
+      paddingLeft: 4,
+    },
+    helpDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    helpCode: {
+      fontSize: 12,
+      color: colors.primary,
+      fontFamily: 'monospace' as const,
+    },
   };
 }
