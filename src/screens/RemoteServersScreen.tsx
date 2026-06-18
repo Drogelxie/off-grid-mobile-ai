@@ -230,6 +230,18 @@ export const RemoteServersScreen: React.FC = () => {
             Make sure your server is running and accessible from your device. For security, only connect to servers on trusted networks.
           </Text>
         </View>
+
+        <View style={[styles.infoCard, styles.infoCardAgent]}>
+          <View style={styles.infoCardHeader}>
+            <Icon name="folder" size={16} color={theme.colors.secondary} />
+            <Text style={styles.infoTitleInline}>Work with Files on Your PC</Text>
+          </View>
+          <Text style={styles.infoText}>
+            Run an agent on your PC - Open WebUI, LangChain, or a similar framework - that has access to a folder on that machine. Add it here as a regular server.{'\n\n'}
+            The agent reads and writes files on the PC directly. The app acts as the chat interface; all file operations happen on the PC side. No Android file access needed.{'\n\n'}
+            Example: Ollama + Open WebUI on your PC with a folder tool configured. During conversation, the AI can read, create, and edit files in that folder. The files never leave your local network.
+          </Text>
+        </View>
       </ScrollView>
 
       <RemoteServerModal

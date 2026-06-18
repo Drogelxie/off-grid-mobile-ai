@@ -114,6 +114,42 @@ This gives you access to your home desktop's models from anywhere - coffee shop,
 
 ---
 
+## Work with files on your PC
+
+Run an agent framework on your PC that has access to a folder on that machine, then connect to it from Off Grid as a regular server. The agent reads and writes files on the PC directly - Off Grid is the chat interface, all file operations happen on the PC.
+
+This bypasses Android's file system restrictions entirely: the files never move to the phone.
+
+**What to run on your PC:**
+
+| Tool | Setup effort | What it provides |
+|---|---|---|
+| **Open WebUI** + Ollama | Low - Docker one-liner | File tool plugins, full chat UI, exposes `/v1/chat/completions` |
+| **LangChain + FastAPI** | Medium - a few lines of Python | Custom agent, any folder you choose, full control |
+| **Jan** | Low - desktop app | Built-in local API, tool support |
+
+**How it works:**
+
+1. Start the agent on your PC - it exposes `/v1/chat/completions` on your LAN
+2. In Off Grid, go to **Settings - Remote Servers - Add Server**, enter the PC's local IP and port
+3. Select the agent's model in the model picker
+4. In conversation, ask the AI to read or write files in the configured folder
+
+The agent executes file operations locally on the PC and returns results as chat text. Chat messages travel over your LAN; file contents stay on the PC's storage.
+
+**Open WebUI quick start (Docker):**
+```bash
+docker run -d \
+  -p 3000:8080 \
+  -v /your/folder:/data/folder \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  --name open-webui \
+  ghcr.io/open-webui/open-webui:main
+```
+Then add `http://192.168.x.x:3000` as a server in Off Grid.
+
+---
+
 ## Security note
 
 Off Grid warns you before connecting to a public internet endpoint (non-private IP range). For remote access, always use Tailscale or a similar private tunnel rather than exposing your server directly to the internet.
