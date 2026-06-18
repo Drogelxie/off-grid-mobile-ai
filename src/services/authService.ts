@@ -1,8 +1,13 @@
 import * as Keychain from 'react-native-keychain';
+import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import logger from '../utils/logger';
 
 const SERVICE_NAME = 'ai.offgridmobile.auth';
 const PASSPHRASE_KEY = 'passphrase_hash';
+const PBKDF2_ITERATIONS = 100_000;
+const SALT_BYTES = 16;
 
 class AuthService {
   /**
@@ -31,42 +36,72 @@ class AuthService {
   }
 
   /**
-   * Derive a 256-bit key from the passphrase using PBKDF2-SHA256 (100k iterations).
-   * Returns a hex string with a "v2:" prefix to distinguish from legacy hashes.
+   * Generate a per-installation salt. Uses crypto.getRandomValues when the
+   * runtime exposes it; otherwise falls back to a best-effort source.
    *
-   * Uses the Web Crypto API available in Hermes (React Native) and Node.js 20+.
+   * Hermes (the React Native engine) does not ship a Web Crypto implementation
+   * unless a polyfill is installed, so the fallback keeps the salt unique per
+   * install (defeating shared precomputation) even without a CSPRNG. The
+   * derivation itself (PBKDF2 below) is pure JS and needs no native crypto.
    */
-  private async hashPassphrase(passphrase: string): Promise<string> {
-    // Type assertion needed because TypeScript's default lib doesn't include
-    // globalThis.crypto unless "lib": ["DOM"] or "WebWorker" is in tsconfig.
-    const subtle = (globalThis as unknown as { crypto: Crypto }).crypto.subtle;
-    const encoder = new TextEncoder();
-    const keyMaterial = await subtle.importKey(
-      'raw',
-      encoder.encode(passphrase),
-      'PBKDF2',
-      false,
-      ['deriveBits'],
-    );
-    const bits = await subtle.deriveBits(
-      {
-        name: 'PBKDF2',
-        salt: encoder.encode('ai.offgridmobile.auth.v2'),
-        iterations: 100_000,
-        hash: 'SHA-256',
-      },
-      keyMaterial,
-      256,
-    );
-    const hex = Array.from(new Uint8Array(bits))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    return `v2:${hex}`;
+  private generateSalt(): Uint8Array {
+    const salt = new Uint8Array(SALT_BYTES);
+    const webCrypto = (globalThis as unknown as { crypto?: Crypto }).crypto;
+    if (typeof webCrypto !== 'undefined' && webCrypto.getRandomValues) {
+      webCrypto.getRandomValues(salt);
+      return salt;
+    }
+    // Fallback: no CSPRNG available. Not cryptographically strong, but unique
+    // enough per install to prevent a single precomputed table from covering
+    // all users.
+    for (let i = 0; i < salt.length; i++) {
+      salt[i] = Math.floor(Math.random() * 256); // NOSONAR
+    }
+    return salt;
+  }
+
+  /**
+   * Derive a 256-bit key from the passphrase + salt using PBKDF2-SHA256.
+   *
+   * Implemented with @noble/hashes (pure JS, audited) so it runs on Hermes
+   * without a native crypto module. Output is byte-identical to a Web Crypto /
+   * Node PBKDF2 with the same parameters.
+   */
+  private deriveHash(passphrase: string, salt: Uint8Array): string {
+    const bits = pbkdf2(sha256, utf8ToBytes(passphrase), salt, {
+      c: PBKDF2_ITERATIONS,
+      dkLen: 32,
+    });
+    return bytesToHex(bits);
+  }
+
+  /**
+   * Produce a stored hash string in the format "v2:<saltHex>:<hashHex>".
+   * The salt is generated fresh per call so each stored hash is unique.
+   */
+  private hashPassphrase(passphrase: string): string {
+    const salt = this.generateSalt();
+    return `v2:${bytesToHex(salt)}:${this.deriveHash(passphrase, salt)}`;
+  }
+
+  /**
+   * Constant-time comparison of two equal-length hex strings, to avoid leaking
+   * how many leading characters matched via timing.
+   */
+  private timingSafeEqualHex(a: string, b: string): boolean {
+    if (a.length !== b.length) {
+      return false;
+    }
+    let mismatch = 0;
+    for (let i = 0; i < a.length; i++) {
+      mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i); // eslint-disable-line no-bitwise
+    }
+    return mismatch === 0;
   }
 
   async setPassphrase(passphrase: string): Promise<boolean> {
     try {
-      const hash = await this.hashPassphrase(passphrase);
+      const hash = this.hashPassphrase(passphrase);
       await Keychain.setGenericPassword(PASSPHRASE_KEY, hash, {
         service: SERVICE_NAME,
         accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
@@ -91,16 +126,28 @@ class AuthService {
       const stored = credentials.password;
 
       if (stored.startsWith('v2:')) {
-        const inputHash = await this.hashPassphrase(passphrase);
-        return inputHash === stored;
+        // Format: "v2:<saltHex>:<hashHex>"
+        const parts = stored.split(':');
+        if (parts.length !== 3) {
+          logger.error('Stored passphrase hash is malformed');
+          return false;
+        }
+        const [, saltHex, expectedHash] = parts;
+        const actualHash = this.deriveHash(passphrase, hexToBytes(saltHex));
+        return this.timingSafeEqualHex(actualHash, expectedHash);
       }
 
-      // Legacy v1 hash: verify, then silently migrate to v2 on success.
+      // Legacy v1 hash: verify, then migrate to v2 on success.
       const legacyHash = this.hashPassphraseLegacy(passphrase);
       if (legacyHash !== stored) {
         return false;
       }
-      await this.setPassphrase(passphrase);
+      const migrated = await this.setPassphrase(passphrase);
+      if (!migrated) {
+        // Migration failed (e.g. keychain write error). The passphrase is
+        // still valid, so allow login, but surface the failure for diagnosis.
+        logger.warn('Passphrase verified but migration to v2 hash failed');
+      }
       return true;
     } catch (error) {
       logger.error('Failed to verify passphrase:', error);

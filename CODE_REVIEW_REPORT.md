@@ -120,25 +120,34 @@ Die meisten betreffen Build-/Dev-Toolchain (kein Runtime-Risiko in der App). `ma
 
 ---
 
-## 4. Durchgeführte Änderungen
-Keine Code-Änderungen vorgenommen. Befund 1 ist verhaltensändernd (braucht eine Polyfill-/Architekturentscheidung des Maintainers) und wurde daher als Empfehlung dokumentiert statt blind gefixt. Baseline (tsc/eslint/Tests) wurde nicht verschlechtert.
+## 4. Durchgeführte Änderungen (behebt Befunde 1–6)
+
+Alle Fixes verhaltensbewahrend für gültige Logins; Hash-Mechanismus geändert (war auf dem Gerät ohnehin nicht funktional). **BELEG:** `npx tsc --noEmit` EXIT 0; `npx eslint` auf geänderten Dateien EXIT 0; **`npx jest` → 182 Suites, 5498 passed, 4 skipped (Baseline)**, Time 31.8 s.
+
+- **Dependency:** `@noble/hashes@^2.2.0` ergänzt (pure JS, audited, zero-dep). `npm install` reicht — kein nativer Rebuild nötig.
+- **Befund 1 (🔴) — `authService.ts`:** `crypto.subtle` ersetzt durch `pbkdf2(sha256, …)` aus `@noble/hashes`. Reine-JS-Implementierung, läuft auf Hermes ohne Polyfill; Output byte-identisch zu Web-Crypto/Node-PBKDF2 (verifiziert). 100k Iterationen, SHA-256.
+- **Befund 2 (🟠) — Salt:** Pro-Aufruf zufälliges 16-Byte-Salt via `crypto.getRandomValues` mit Math.random-Fallback (analog zum bestehenden `generateId`-Muster). Neues Format `v2:<saltHex>:<hashHex>`. Gleiche Passphrase erzeugt jetzt unterschiedliche Hashes (getestet).
+- **Befund 3 (🟡) — Vergleich:** konstantzeitiger Hex-Vergleich `timingSafeEqualHex` statt `===`.
+- **Befund 4 (🟡) — Doku:** falscher "available in Hermes"-Kommentar entfernt, durch korrekte Beschreibung (pure-JS, Hermes-safe) ersetzt.
+- **Befund 5 (🟡) — Migration:** `setPassphrase`-Rückgabe wird geprüft; bei Fehlschlag `logger.warn` statt stillem Schlucken.
+- **Tests — `authService.test.ts`:** Neuer Regressionstest "ohne Web-Crypto-Runtime (Hermes)" entfernt `global.crypto` und beweist, dass set/verify weiterhin funktionieren — genau der Fall, der vorher still in Produktion versagte. Plus Salt-Eindeutigkeits-Test. `jest.config.js`: `@noble` zu `transformIgnorePatterns` ergänzt (noble ist ESM).
+- **Befund 6 (🟡) — re-bewertet als Non-Issue:** `generate()` ist der einzige Egress-Pfad mit Nutzerdaten und ist gegated; `getTokenCount` ist eine lokale `length/4`-Schätzung (kein Netz), `loadModel` setzt nur ein Feld. Der Kommentar in `httpClient.ts:180` ist damit korrekt.
 
 ## 5. Offene Punkte — priorisiert
 
-| # | Befund | Schwere | Empfehlung | Aufwand |
-|---|--------|---------|------------|---------|
-| 1 | PBKDF2 nutzt `crypto.subtle`, das Hermes nicht hat → Passphrase-Setup still kaputt | 🔴 | Crypto-Polyfill (quick-crypto) + Jest-Setup an Zielplattform anpassen | M |
-| 2 | Statisches PBKDF2-Salt | 🟠 | Pro-Installation zufälliges Salt, mit Hash speichern | S |
-| 8 | Kritische transitive CVEs (`xmldom`/`fast-xml-parser`), `markdown-it` ReDoS | 🟠 | `markdown-it` zuerst; CLI-Kette per `--force` in eigenem PR | M |
-| 5 | Migration schluckt Fehlschlag still | 🟡 | Rückgabewert prüfen + `logger.warn` | S |
-| 6 | Network-Gate nur in `generate()`, Kommentar überzeichnet | 🟡 | zentralisieren oder Kommentar korrigieren | S |
-| 3 | Nicht-konstantzeitiger Hash-Vergleich | 🟡 | mit Befund 1 zusammen lösen | S |
-| 4 | Falscher/quellenloser Hermes-Kommentar | 🟡 | nach Fix korrigieren | S |
-| 7 | CGNAT-Regex ohne Oktett-Range-Check | 🟡 | optional 0-255 erzwingen | S |
-| 9 | 30 exhaustive-deps-Warnings (Baseline) | 🟡 | bei i18n-`t`-Closures priorisiert prüfen | M |
+| # | Befund | Schwere | Status |
+|---|--------|---------|--------|
+| 1 | PBKDF2 auf Hermes kaputt | 🔴 | **behoben** (pure-JS noble) — vor Release einmal echten App-Build verifizieren (siehe Schritt 1) |
+| 2 | Statisches PBKDF2-Salt | 🟠 | **behoben** (per-install Salt) |
+| 3 | Nicht-konstantzeitiger Vergleich | 🟡 | **behoben** |
+| 4 | Falscher Hermes-Kommentar | 🟡 | **behoben** |
+| 5 | Migration schluckt Fehlschlag | 🟡 | **behoben** |
+| 6 | Network-Gate-Kommentar | 🟡 | **re-bewertet: kein Issue** |
+| 8 | Transitive CVEs / `markdown-it` ReDoS | 🟠 | **offen** — `markdown-it` zuerst; CLI-Kette per `--force` in eigenem Chore-PR |
+| 7 | CGNAT-Regex ohne Oktett-Range | 🟡 | **offen** (kosmetisch; bewusst gelassen, sonst inkonsistent zu den übrigen Range-Checks) |
+| 9 | 30 exhaustive-deps-Warnings | 🟡 | **offen** (Baseline; bei i18n-`t`-Closures priorisiert prüfen) |
 
 ## 6. Nächste Schritte
-1. **Befund 1 zuerst** — ohne Polyfill ist die zentrale Security-Änderung dieses Branches eine Regression. Erst Polyfill, dann Jest-Setup so anpassen, dass der Test den realen Pfad (nicht Node-Crypto) prüft, dann erneut `npm test`.
-2. Befund 2 im selben PR mitnehmen (Salt-Format ändert sich ohnehin → v2-Format gleich richtig definieren, bevor v2-Hashes in freier Wildbahn sind).
-3. Separater Chore-PR für die Dependency-Audit-Bereinigung (Befund 8), getrennt vom Security-/UX-Branch.
-4. Kleine 🟡-Fixes (3,4,5,6,7) gebündelt nachziehen.
+1. **Echten App-Build verifizieren:** Der einzige nicht in dieser Umgebung prüfbare Punkt ist Metros Auflösung der `@noble/hashes`-ESM-`.js`-Subpath-Exports zur Laufzeit. RN 0.83 Metro unterstützt Package-Exports; noble v2 wird breit in RN genutzt. Einmal `npm run android`/`ios` starten und einen Passphrase-Setup-Durchlauf am Gerät bestätigen.
+2. Separater Chore-PR für die Dependency-Audit-Bereinigung (Befund 8), getrennt vom Security-/UX-Branch.
+3. Optional: 🟡-Reste (7, 9) bei Gelegenheit.
