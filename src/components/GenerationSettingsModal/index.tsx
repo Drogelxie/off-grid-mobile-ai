@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { AppSheet } from '../AppSheet';
 import { useTheme, useThemedStyles } from '../../theme';
 import { useAppStore } from '../../stores';
@@ -44,6 +45,7 @@ export const GenerationSettingsModal: React.FC<GenerationSettingsModalProps> = (
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const { updateSettings } = useAppStore();
+  const { t } = useTranslation();
 
   const [performanceStats, setPerformanceStats] = useState(llmService.getPerformanceStats());
   const [imageSettingsOpen, setImageSettingsOpen] = useState(false);
@@ -66,7 +68,7 @@ export const GenerationSettingsModal: React.FC<GenerationSettingsModalProps> = (
       visible={visible}
       onClose={onClose}
       snapPoints={['50%', '90%']}
-      title="Chat Settings"
+      title={t('generationSettings.title')}
     >
       {performanceStats.lastTokensPerSecond > 0 && (
         <View style={styles.statsBar}>
@@ -108,7 +110,7 @@ export const GenerationSettingsModal: React.FC<GenerationSettingsModalProps> = (
           onPress={() => setImageSettingsOpen(!imageSettingsOpen)}
           activeOpacity={0.7}
         >
-          <Text style={styles.accordionTitle}>IMAGE GENERATION</Text>
+          <Text style={styles.accordionTitle}>{t('generationSettings.imageGeneration')}</Text>
           <Icon
             name={imageSettingsOpen ? 'chevron-up' : 'chevron-down'}
             size={16}
@@ -123,7 +125,7 @@ export const GenerationSettingsModal: React.FC<GenerationSettingsModalProps> = (
           onPress={() => setTextSettingsOpen(!textSettingsOpen)}
           activeOpacity={0.7}
         >
-          <Text style={styles.accordionTitle}>TEXT GENERATION</Text>
+          <Text style={styles.accordionTitle}>{t('generationSettings.textGeneration')}</Text>
           <Icon
             name={textSettingsOpen ? 'chevron-up' : 'chevron-down'}
             size={16}
@@ -135,9 +137,7 @@ export const GenerationSettingsModal: React.FC<GenerationSettingsModalProps> = (
             {isRemote && (
               <View style={styles.remoteNotice}>
                 <Icon name="info" size={13} color={colors.textMuted} />
-                <Text style={styles.remoteNoticeText}>
-                  These settings only apply to local models and won't affect the current remote session.
-                </Text>
+                <Text style={styles.remoteNoticeText}>{t('generationSettings.remoteNotice')}</Text>
               </View>
             )}
             <TextGenerationSection />
@@ -145,7 +145,7 @@ export const GenerationSettingsModal: React.FC<GenerationSettingsModalProps> = (
         )}
 
         <TouchableOpacity style={styles.resetButton} onPress={handleResetDefaults}>
-          <Text style={styles.resetButtonText}>Reset to Defaults</Text>
+          <Text style={styles.resetButtonText}>{t('generationSettings.resetToDefaults')}</Text>
         </TouchableOpacity>
 
         <View style={styles.bottomPadding} />

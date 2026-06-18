@@ -13,8 +13,10 @@ import { createStyles } from './styles';
 import { initialFilterState } from './constants';
 import { TextModelsTab } from './TextModelsTab';
 import { ImageModelsTab } from './ImageModelsTab';
+import { useTranslation } from 'react-i18next';
 
 export const ModelsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const vm = useModelsScreen();
@@ -53,7 +55,7 @@ export const ModelsScreen: React.FC = () => {
       <View style={isShowingDetail ? collapsedStyle.hidden : undefined}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Models</Text>
+          <Text style={styles.title}>{t('models.title')}</Text>
           <AttachStep index={10}>
             <TouchableOpacity
               style={styles.downloadManagerButton}
@@ -77,7 +79,7 @@ export const ModelsScreen: React.FC = () => {
               <View style={styles.importProgressHeader}>
                 <Icon name="file" size={18} color={colors.primary} />
                 <Text style={styles.importProgressText} numberOfLines={1}>
-                  Importing {vm.importProgress.fileName}
+                  {t('models.importLocalFile')} {vm.importProgress.fileName}
                 </Text>
               </View>
               <View style={styles.imageProgressBar}>
@@ -90,7 +92,7 @@ export const ModelsScreen: React.FC = () => {
           ) : (
             <TouchableOpacity style={styles.importButton} onPress={vm.handleImportLocalModel} testID="import-local-model" disabled={vm.isImporting}>
               <Icon name="folder-plus" size={20} color={colors.primary} />
-              <Text style={styles.importButtonText}>Import Local File</Text>
+              <Text style={styles.importButtonText}>{t('models.importLocalFile')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -106,7 +108,7 @@ export const ModelsScreen: React.FC = () => {
               vm.setImageFiltersVisible(false);
             }}
           >
-            <Text style={[styles.tabText, vm.activeTab === 'text' && styles.tabTextActive]}>Text Models</Text>
+            <Text style={[styles.tabText, vm.activeTab === 'text' && styles.tabTextActive]}>{t('models.textModels')}</Text>
             {vm.activeTab === 'text' && <View style={styles.tabIndicator} />}
           </TouchableOpacity>
           <AttachStep index={4}>
@@ -119,7 +121,7 @@ export const ModelsScreen: React.FC = () => {
                 vm.setImageFiltersVisible(false);
               }}
             >
-              <Text style={[styles.tabText, vm.activeTab === 'image' && styles.tabTextActive]}>Image Models</Text>
+              <Text style={[styles.tabText, vm.activeTab === 'image' && styles.tabTextActive]}>{t('models.imageModels')}</Text>
               {vm.activeTab === 'image' && <View style={styles.tabIndicator} />}
             </TouchableOpacity>
           </AttachStep>

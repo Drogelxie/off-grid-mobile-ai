@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { useTheme, useThemedStyles } from '../../theme';
 import { AppSheet } from '../AppSheet';
 import { CustomAlert } from '../CustomAlert';
@@ -34,44 +35,48 @@ interface TestResultSectionProps {
   styles: ReturnType<typeof createStyles>;
 }
 
-const TestResultSection: React.FC<TestResultSectionProps> = ({ testResult, discoveredModels, styles }) => (
-  <>
-    {testResult && (
-      <View style={styles.statusContainer}>
-        <View style={[styles.statusDot, testResult.success ? styles.statusDotSuccess : styles.statusDotError]} />
-        <Text style={styles.statusText}>{testResult.message}</Text>
-      </View>
-    )}
-    {discoveredModels.length > 0 && (
-      <View style={styles.modelList}>
-        <Text style={styles.sectionHeader}>Discovered Models</Text>
-        <ScrollView style={styles.modelScroll} nestedScrollEnabled>
-          {discoveredModels.map((model) => (
-            <View key={model.id} style={styles.modelItem}>
-              <Text style={styles.modelName}>{model.name}</Text>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
-    )}
-  </>
-);
+const TestResultSection: React.FC<TestResultSectionProps> = ({ testResult, discoveredModels, styles }) => {
+  const { t } = useTranslation();
+  return (
+    <>
+      {testResult && (
+        <View style={styles.statusContainer}>
+          <View style={[styles.statusDot, testResult.success ? styles.statusDotSuccess : styles.statusDotError]} />
+          <Text style={styles.statusText}>{testResult.message}</Text>
+        </View>
+      )}
+      {discoveredModels.length > 0 && (
+        <View style={styles.modelList}>
+          <Text style={styles.sectionHeader}>{t('addServerModal.discoveredModels')}</Text>
+          <ScrollView style={styles.modelScroll} nestedScrollEnabled>
+            {discoveredModels.map((model) => (
+              <View key={model.id} style={styles.modelItem}>
+                <Text style={styles.modelName}>{model.name}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </>
+  );
+};
 
 const EndpointHelpPanel: React.FC<{ styles: ReturnType<typeof createStyles> }> = ({ styles }) => {
   const theme = useTheme();
+  const { t } = useTranslation();
   return (
     <View style={styles.helpPanel}>
       <View style={styles.helpScenario}>
         <View style={styles.helpScenarioHeader}>
           <Icon name="wifi" size={13} color={theme.colors.secondary} />
-          <Text style={styles.helpScenarioTitle}>Same WiFi network</Text>
+          <Text style={styles.helpScenarioTitle}>{t('addServerModal.helpWifiTitle')}</Text>
         </View>
-        <Text style={styles.helpStep}>1. Find your PC's local IP address:</Text>
-        <Text style={styles.helpStep}>{'   '}Windows: open Command Prompt, run <Text style={styles.helpCode}>ipconfig</Text> - look for IPv4 Address</Text>
-        <Text style={styles.helpStep}>{'   '}Mac / Linux: run <Text style={styles.helpCode}>ip addr</Text> or <Text style={styles.helpCode}>ifconfig</Text></Text>
-        <Text style={styles.helpStep}>2. Use that IP with the server port:</Text>
-        <Text style={styles.helpStep}>{'   '}Ollama: <Text style={styles.helpCode}>http://192.168.1.X:11434</Text></Text>
-        <Text style={styles.helpStep}>{'   '}LM Studio: <Text style={styles.helpCode}>http://192.168.1.X:1234</Text></Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpWifiStep1')}</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpWifiWindows')}</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpWifiMac')}</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpWifiStep2')}</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpWifiOllama')}</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpWifiLmStudio')}</Text>
       </View>
 
       <View style={styles.helpDivider} />
@@ -79,13 +84,13 @@ const EndpointHelpPanel: React.FC<{ styles: ReturnType<typeof createStyles> }> =
       <View style={styles.helpScenario}>
         <View style={styles.helpScenarioHeader}>
           <Icon name="shield" size={13} color={theme.colors.info} />
-          <Text style={styles.helpScenarioTitle}>Outside your home - secure with Tailscale</Text>
+          <Text style={styles.helpScenarioTitle}>{t('addServerModal.helpTailscaleTitle')}</Text>
         </View>
-        <Text style={styles.helpStep}>1. Install Tailscale on your PC and this phone (tailscale.com - free)</Text>
-        <Text style={styles.helpStep}>2. Sign in with the same account on both devices</Text>
-        <Text style={styles.helpStep}>3. Your PC gets a Tailscale IP starting with <Text style={styles.helpCode}>100.</Text></Text>
-        <Text style={styles.helpStep}>4. Use that IP here: <Text style={styles.helpCode}>http://100.X.X.X:11434</Text></Text>
-        <Text style={styles.helpStep}>{'   '}Connection is encrypted via WireGuard. No port forwarding needed.</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpTailscaleStep1')}</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpTailscaleStep2')}</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpTailscaleStep3')}</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpTailscaleStep4')}</Text>
+        <Text style={styles.helpStep}>{t('addServerModal.helpTailscaleNote')}</Text>
       </View>
     </View>
   );
@@ -99,6 +104,7 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
 }) => {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
+  const { t } = useTranslation();
 
   const [showApiKey, setShowApiKey] = useState(false);
   const [showEndpointHelp, setShowEndpointHelp] = useState(false);
@@ -132,16 +138,16 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
       visible={visible}
       onClose={onClose}
       onHeaderClosePress={handleDonePress}
-      title={server ? 'Edit Server' : 'Add Remote Server'}
-      closeLabel="Done"
+      title={server ? t('addServerModal.editTitle') : t('addServerModal.addTitle')}
+      closeLabel={t('addServerModal.done')}
       snapPoints={['80%']}
       enableDynamicSizing
     >
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.label}>Server Name</Text>
+        <Text style={styles.label}>{t('addServerModal.serverNameLabel')}</Text>
         <TextInput
           style={[styles.input, errors.name && styles.inputError]}
-          placeholder="e.g., Ollama Desktop"
+          placeholder={t('addServerModal.serverNamePlaceholder')}
           placeholderTextColor={theme.colors.textMuted}
           value={name}
           onChangeText={setName}
@@ -149,10 +155,10 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
         />
         {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
 
-        <Text style={styles.label}>Endpoint URL</Text>
+        <Text style={styles.label}>{t('addServerModal.endpointLabel')}</Text>
         <TextInput
           style={[styles.input, errors.endpoint && styles.inputError]}
-          placeholder="http://192.168.1.50:11434"
+          placeholder={t('addServerModal.endpointPlaceholder')}
           placeholderTextColor={theme.colors.textMuted}
           value={endpoint}
           onChangeText={setEndpoint}
@@ -164,14 +170,14 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
         {isPublicNetwork && (
           <View style={styles.warningContainer}>
             <Text style={styles.warningText}>
-              ⚠️ This endpoint is on the public internet. Your data will be sent to a remote server.
+              {t('addServerModal.publicNetworkWarning')}
             </Text>
           </View>
         )}
         <Text style={styles.helperText}>
           {endpoint.trim()
-            ? `Will connect to: ${endpoint.trim().replace(/\/+$/, '')}/v1/models`
-            : 'Enter the base URL — /v1/models will be appended automatically'}
+            ? t('addServerModal.endpointWillConnect', { url: endpoint.trim().replace(/\/+$/, '') })
+            : t('addServerModal.endpointHelper')}
         </Text>
         <TouchableOpacity
           style={styles.helpToggle}
@@ -183,16 +189,16 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
             color={theme.colors.primary}
           />
           <Text style={styles.helpToggleText}>
-            {showEndpointHelp ? 'Hide setup help' : 'How do I find the address?'}
+            {showEndpointHelp ? t('addServerModal.helpToggleHide') : t('addServerModal.helpToggleShow')}
           </Text>
         </TouchableOpacity>
         {showEndpointHelp && <EndpointHelpPanel styles={styles} />}
 
-        <Text style={styles.label}>API Key (Optional)</Text>
+        <Text style={styles.label}>{t('addServerModal.apiKeyLabel')}</Text>
         <View style={styles.apiKeyContainer}>
           <TextInput
             style={[styles.input, styles.apiKeyInput]}
-            placeholder="sk-..."
+            placeholder={t('addServerModal.apiKeyPlaceholder')}
             placeholderTextColor={theme.colors.textMuted}
             value={apiKey}
             onChangeText={setApiKey}
@@ -205,13 +211,13 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
           </TouchableOpacity>
         </View>
         <Text style={styles.helperText}>
-          Stored in the device keychain. Required for some servers - check your server's settings.
+          {t('addServerModal.apiKeyHelper')}
         </Text>
 
-        <Text style={styles.label}>Notes (Optional)</Text>
+        <Text style={styles.label}>{t('addServerModal.notesLabel')}</Text>
         <TextInput
           style={[styles.input, styles.notesInput]}
-          placeholder="Add notes about this server..."
+          placeholder={t('addServerModal.notesPlaceholder')}
           placeholderTextColor={theme.colors.textMuted}
           value={notes}
           onChangeText={setNotes}
@@ -222,7 +228,7 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
         <TestResultSection testResult={testResult} discoveredModels={discoveredModels} styles={styles} />
         {!testResult?.success && (
           <Text style={styles.helperText}>
-            Test connection first to enable {server ? 'Update Server' : 'Add Server'}.
+            {t('addServerModal.testFirst', { action: server ? t('addServerModal.updateServer') : t('addServerModal.addServer') })}
           </Text>
         )}
 
@@ -236,7 +242,7 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
               <ActivityIndicator size="small" color={theme.colors.background} />
             ) : (
               <Text style={[styles.testButtonText, isTesting && styles.testButtonTextDisabled]}>
-                Test Connection
+                {t('addServerModal.testConnection')}
               </Text>
             )}
           </TouchableOpacity>
@@ -247,7 +253,7 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
             disabled={!testResult?.success}
           >
             <Text style={[styles.saveButtonText, !testResult?.success && styles.saveButtonTextDisabled]}>
-              {server ? 'Update Server' : 'Add Server'}
+              {server ? t('addServerModal.updateServer') : t('addServerModal.addServer')}
             </Text>
           </TouchableOpacity>
         </View>

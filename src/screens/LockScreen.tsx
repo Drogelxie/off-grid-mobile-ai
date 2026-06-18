@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { Button, CustomAlert } from '../components';
 import {
   showAlert,
@@ -27,6 +28,7 @@ interface LockScreenProps {
 }
 
 export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
+  const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
@@ -83,16 +85,16 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
         if (isLockedOut) {
           setAlertState(
             showAlert(
-              'Too Many Attempts',
-              'You have been locked out for 5 minutes due to too many failed attempts.'
+              t('lockScreen.tooManyAttempts'),
+              t('lockScreen.lockedOut')
             )
           );
         } else {
           const remaining = 5 - (failedAttempts + 1);
           const alertMessage = remaining > 0
-            ? `${remaining} attempt${remaining === 1 ? '' : 's'} remaining before lockout.`
-            : 'Incorrect passphrase.';
-          setAlertState(showAlert('Incorrect Passphrase', alertMessage));
+            ? t('lockScreen.attemptsRemaining', { count: remaining })
+            : t('lockScreen.incorrectPassphrase');
+          setAlertState(showAlert(t('lockScreen.incorrectPassphrase'), alertMessage));
         }
       }
     } catch (error) {
@@ -121,17 +123,15 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
           <View style={styles.lockIconContainer}>
             <Icon name="lock" size={48} color={colors.primary} />
           </View>
-          <Text style={styles.title}>App Locked</Text>
-          <Text style={styles.subtitle}>
-            Enter your passphrase to unlock
-          </Text>
+          <Text style={styles.title}>{t('lockScreen.appLocked')}</Text>
+          <Text style={styles.subtitle}>{t('lockScreen.enterPassphrase')}</Text>
         </View>
 
         {isLockedOut ? (
           <View style={styles.lockoutContainer}>
-            <Text style={styles.lockoutText}>Too many failed attempts</Text>
+            <Text style={styles.lockoutText}>{t('lockScreen.lockoutHeading')}</Text>
             <Text style={styles.lockoutTimer}>{formatTime(lockoutSeconds)}</Text>
-            <Text style={styles.lockoutHint}>Please wait before trying again</Text>
+            <Text style={styles.lockoutHint}>{t('lockScreen.pleaseWait')}</Text>
           </View>
         ) : (
           <View style={styles.inputContainer}>
@@ -139,7 +139,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
               style={styles.input}
               value={passphrase}
               onChangeText={setPassphrase}
-              placeholder="Enter passphrase"
+              placeholder={t('lockScreen.passphraseField')}
               placeholderTextColor={colors.textMuted}
               secureTextEntry
               autoCapitalize="none"
@@ -149,7 +149,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
             />
 
             <Button
-              title={isVerifying ? 'Verifying...' : 'Unlock'}
+              title={isVerifying ? t('lockScreen.verifying') : t('lockScreen.unlock')}
               onPress={handleUnlock}
               disabled={isVerifying || !passphrase.trim()}
               style={styles.unlockButton}
@@ -157,7 +157,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
 
             {failedAttempts > 0 && (
               <Text style={styles.attemptsText}>
-                {5 - failedAttempts} attempt{5 - failedAttempts === 1 ? '' : 's'} remaining
+                {t('lockScreen.attemptsRemaining', { count: 5 - failedAttempts })}
               </Text>
             )}
           </View>
@@ -165,9 +165,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
 
         <View style={styles.footer}>
           <Icon name="shield" size={20} color={colors.textMuted} />
-          <Text style={styles.footerText}>
-            Your data is protected and stored locally
-          </Text>
+          <Text style={styles.footerText}>{t('lockScreen.dataProtected')}</Text>
         </View>
       </KeyboardAvoidingView>
 

@@ -385,6 +385,51 @@ jest.mock('react-native-zip-archive', () => ({
 
 // Mock react-native-vector-icons
 jest.mock('react-native-vector-icons/Feather', () => 'Icon');
+jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'IconMC');
+jest.mock('react-native-vector-icons/MaterialIcons', () => 'IconMI');
+
+// ============================================================================
+// i18n Mock — returns real English translations in tests
+// ============================================================================
+
+jest.mock('i18next', () => ({
+  use: jest.fn().mockReturnThis(),
+  init: jest.fn().mockResolvedValue(null),
+  changeLanguage: jest.fn().mockResolvedValue(null),
+  t: (key: string) => key,
+  language: 'en',
+}));
+
+jest.mock('react-i18next', () => {
+  function lookup(obj: any, keys: string[]): string | undefined {
+    if (!obj || keys.length === 0) return undefined;
+    const [head, ...tail] = keys;
+    if (tail.length === 0) return typeof obj[head] === 'string' ? obj[head] : undefined;
+    return lookup(obj[head], tail);
+  }
+  const translations = require('./src/i18n/locales/en').en;
+  function t(key: string, options?: Record<string, any>): string {
+    const parts = key.split('.');
+    let value = lookup(translations, parts);
+    // Handle i18next plural suffix convention (_one / _other)
+    if (value === undefined && options && typeof options.count === 'number') {
+      const suffix = options.count === 1 ? '_one' : '_other';
+      value = lookup(translations, [...parts.slice(0, -1), parts[parts.length - 1] + suffix]);
+    }
+    if (value === undefined) return key;
+    if (options) {
+      Object.entries(options).forEach(([k, v]) => {
+        value = (value as string).replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
+      });
+    }
+    return value as string;
+  }
+  return {
+    useTranslation: () => ({ t, i18n: { changeLanguage: jest.fn(), language: 'en' } }),
+    initReactI18next: { type: '3rdParty', init: jest.fn() },
+    Trans: ({ children }: { children: any }) => children,
+  };
+});
 
 // react-native-spotlight-tour mock
 jest.mock('react-native-spotlight-tour', () => ({

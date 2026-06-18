@@ -275,10 +275,10 @@ describe('ModelCard', () => {
     });
 
     it('shows trending icon in compact mode', () => {
-      const { getByText } = render(
+      const { UNSAFE_getByProps } = render(
         <ModelCard model={baseModel} compact={true} isTrending={true} />
       );
-      expect(getByText('')).toBeTruthy();
+      expect(UNSAFE_getByProps({ name: 'whatshot' })).toBeTruthy();
     });
   });
 

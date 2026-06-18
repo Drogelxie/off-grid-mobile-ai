@@ -18,6 +18,7 @@ import { consumePendingSpotlight } from '../components/onboarding/spotlightState
 import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
 import { TYPOGRAPHY, SPACING } from '../constants';
+import { useTranslation } from 'react-i18next';
 import { useProjectStore } from '../stores';
 import { RootStackParamList } from '../navigation/types';
 
@@ -29,6 +30,7 @@ export const ProjectEditScreen: React.FC = () => {
   const route = useRoute<RouteProps>();
   const projectId = route.params?.projectId;
   const [alertState, setAlertState] = useState<AlertState>(initialAlertState);
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -63,11 +65,11 @@ export const ProjectEditScreen: React.FC = () => {
 
   const handleSave = () => {
     if (!formData.name.trim()) {
-      setAlertState(showAlert('Error', 'Please enter a name for the project'));
+      setAlertState(showAlert(t('common.error'), t('projectEdit.errorNameRequired')));
       return;
     }
     if (!formData.systemPrompt.trim()) {
-      setAlertState(showAlert('Error', 'Please enter a system prompt'));
+      setAlertState(showAlert(t('common.error'), t('projectEdit.errorPromptRequired')));
       return;
     }
 
@@ -100,7 +102,7 @@ export const ProjectEditScreen: React.FC = () => {
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
-            {existingProject ? 'Edit Project' : 'New Project'}
+            {existingProject ? t('projectEdit.editTitle') : t('projectEdit.newTitle')}
           </Text>
           <TouchableOpacity onPress={handleSave} style={styles.headerButton}>
             <Text style={styles.saveText}>Save</Text>
@@ -113,44 +115,44 @@ export const ProjectEditScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           {/* Name */}
-          <Text style={styles.label}>Name *</Text>
+          <Text style={styles.label}>{t('projectEdit.name')}</Text>
           <AttachStep index={8} fill>
             <TextInput
               style={styles.input}
               value={formData.name}
               onChangeText={(text) => setFormData({ ...formData, name: text })}
-              placeholder="e.g., Spanish Learning, Code Review"
+              placeholder={t('projectEdit.namePlaceholder')}
               placeholderTextColor={colors.textMuted}
             />
           </AttachStep>
 
           {/* Description */}
-          <Text style={styles.label}>Description</Text>
+          <Text style={styles.label}>{t('projectEdit.description')}</Text>
           <TextInput
             style={styles.input}
             value={formData.description}
             onChangeText={(text) => setFormData({ ...formData, description: text })}
-            placeholder="Brief description of this project"
+            placeholder={t('projectEdit.descriptionPlaceholder')}
             placeholderTextColor={colors.textMuted}
           />
 
           {/* System Prompt */}
-          <Text style={styles.label}>System Prompt *</Text>
+          <Text style={styles.label}>{t('projectEdit.systemPrompt')}</Text>
           <Text style={styles.hint}>
-            This context is sent to the AI at the start of every chat in this project.
+            {t('projectEdit.systemPromptHint')}
           </Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             value={formData.systemPrompt}
             onChangeText={(text) => setFormData({ ...formData, systemPrompt: text })}
-            placeholder="Enter the instructions or context for the AI..."
+            placeholder={t('projectEdit.systemPromptPlaceholder')}
             placeholderTextColor={colors.textMuted}
             multiline
             textAlignVertical="top"
           />
 
           <Text style={styles.tip}>
-            Tip: Be specific about what you want the AI to do, how it should respond, and any context it needs.
+            {t('projectEdit.tip')}
           </Text>
 
           <View style={styles.bottomPadding} />

@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, FlatList, Platform } from 'react-n
 import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { CustomAlert, hideAlert } from '../../components/CustomAlert';
 import { useTheme, useThemedStyles } from '../../theme';
 import { GeneratedImage } from '../../types';
@@ -19,6 +20,7 @@ export const GalleryScreen: React.FC = () => {
   const route = useRoute<GalleryScreenRouteProp>();
   const conversationId = route.params?.conversationId;
 
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -43,7 +45,7 @@ export const GalleryScreen: React.FC = () => {
     closeViewer,
   } = useGalleryActions(conversationId);
 
-  const screenTitle = conversationId ? 'Chat Images' : 'Gallery';
+  const screenTitle = conversationId ? t('gallery.chatImages') : t('gallery.title');
 
   const renderGridItem = ({ item, index }: { item: GeneratedImage; index: number }) => (
     <GalleryGridItem
@@ -75,9 +77,9 @@ export const GalleryScreen: React.FC = () => {
             <TouchableOpacity style={styles.closeButton} onPress={toggleSelectMode}>
               <Icon name="x" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={styles.title}>{selectedIds.size} selected</Text>
+            <Text style={styles.title}>{t('gallery.selected', { count: selectedIds.size })}</Text>
             <TouchableOpacity style={styles.headerButton} onPress={selectAll}>
-              <Text style={styles.headerButtonText}>All</Text>
+              <Text style={styles.headerButtonText}>{t('gallery.all')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.headerButton, selectedIds.size === 0 && styles.headerButtonDisabled]}
@@ -119,7 +121,7 @@ export const GalleryScreen: React.FC = () => {
             )}
             <View style={styles.genBannerInfo}>
               <Text style={styles.genBannerTitle} numberOfLines={1}>
-                {imageGenState.previewPath ? 'Refining...' : 'Generating...'}
+                {imageGenState.previewPath ? t('gallery.refining') : t('gallery.generating')}
               </Text>
               <Text style={styles.genBannerPrompt} numberOfLines={1}>
                 {imageGenState.prompt}
@@ -151,9 +153,9 @@ export const GalleryScreen: React.FC = () => {
         <View style={styles.emptyContainer}>
           <Icon name="image" size={48} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>
-            {conversationId ? 'No images in this chat' : 'No generated images yet'}
+            {conversationId ? t('gallery.noImagesInChat') : t('gallery.noImages')}
           </Text>
-          <Text style={styles.emptyText}>Generate images from any chat conversation.</Text>
+          <Text style={styles.emptyText}>{t('gallery.generateImages')}</Text>
         </View>
       ) : (
         <FlatList

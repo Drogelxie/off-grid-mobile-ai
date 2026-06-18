@@ -18,6 +18,7 @@ import ReanimatedAnimated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../components';
 import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
@@ -130,6 +131,7 @@ const SlideContent: React.FC<{
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   navigation,
 }) => {
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -191,14 +193,25 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
     colors.info,
   ];
 
-  const renderSlide = ({ item, index }: { item: typeof ONBOARDING_SLIDES[0]; index: number }) => (
-    <SlideContent
-      item={item}
-      isActive={currentIndex === index}
-      styles={styles}
-      accentColor={slideAccentColors[index % slideAccentColors.length]}
-    />
-  );
+  const slideKeys = ['slide1', 'slide2', 'slide3', 'slide4'] as const;
+
+  const renderSlide = ({ item, index }: { item: typeof ONBOARDING_SLIDES[0]; index: number }) => {
+    const slideKey = slideKeys[index] ?? slideKeys[0];
+    const translatedItem = {
+      ...item,
+      keyword: t(`onboarding.${slideKey}.keyword`),
+      title: t(`onboarding.${slideKey}.title`),
+      description: t(`onboarding.${slideKey}.description`),
+    };
+    return (
+      <SlideContent
+        item={translatedItem}
+        isActive={currentIndex === index}
+        styles={styles}
+        accentColor={slideAccentColors[index % slideAccentColors.length]}
+      />
+    );
+  };
 
   const renderDots = () => (
     <View testID="onboarding-dots" style={styles.dotsContainer}>
@@ -239,7 +252,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         <View style={styles.header}>
           {!isLastSlide && (
             <Button
-              title="Skip"
+              title={t('onboarding.skip')}
               variant="ghost"
               onPress={handleSkip}
               testID="onboarding-skip"
@@ -269,7 +282,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
 
         <View style={styles.footer}>
           <Button
-            title={isLastSlide ? 'Get Started' : 'Next'}
+            title={isLastSlide ? t('onboarding.getStarted') : t('onboarding.next')}
             variant="gradient"
             onPress={handleNext}
             size="large"

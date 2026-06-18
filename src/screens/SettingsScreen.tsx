@@ -15,6 +15,7 @@ import { AttachStep } from 'react-native-spotlight-tour';
 import { useNavigation, CommonActions, CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../components';
 import { AnimatedEntry } from '../components/AnimatedEntry';
 import { AnimatedListItem } from '../components/AnimatedListItem';
@@ -29,6 +30,7 @@ import { useAppStore, useRemoteServerStore } from '../stores';
 import { hardwareService } from '../services';
 import { RootStackParamList, MainTabParamList } from '../navigation/types';
 import { GITHUB_URL, SHARE_ON_X_URL } from '../utils/sharePrompt';
+import { SUPPORTED_LANGUAGES } from '../i18n';
 import packageJson from '../../package.json';
 
 const FEEDBACK_EMAIL = 'support@offgridmobile.co';
@@ -43,9 +45,12 @@ export const SettingsScreen: React.FC = () => {
   const focusTrigger = useFocusTrigger();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const { t } = useTranslation();
   const setOnboardingComplete = useAppStore((s) => s.setOnboardingComplete);
   const themeMode = useAppStore((s) => s.themeMode);
   const setThemeMode = useAppStore((s) => s.setThemeMode);
+  const language = useAppStore((s) => s.language);
+  const setLanguage = useAppStore((s) => s.setLanguage);
   const completeChecklistStep = useAppStore((s) => s.completeChecklistStep);
   const resetChecklist = useAppStore((s) => s.resetChecklist);
   const deviceInfo = useAppStore((s) => s.deviceInfo);
@@ -113,7 +118,7 @@ export const SettingsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
+        <Text style={styles.title}>{t('settings.title')}</Text>
       </View>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
 
@@ -130,7 +135,7 @@ export const SettingsScreen: React.FC = () => {
                 <View style={styles.proCardHeaderText}>
                   <Text style={styles.proTitle}>Off Grid PRO</Text>
                   <Text style={styles.proDesc}>
-                    Unlock advanced features for a premium local-first experience.
+                    {t('settings.unlockPremiumFeatures')}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setProBannerDismissed(true)} style={styles.proCloseButton}>
@@ -159,16 +164,40 @@ export const SettingsScreen: React.FC = () => {
                 onPress={() => navigation.navigate('ProDetail')}
                 activeOpacity={0.8}
               >
-                <Text style={styles.proCtaText}>I am in 🔥</Text>
+                <Text style={styles.proCtaText}>{t('proDetail.iAmIn')}</Text>
               </TouchableOpacity>
             </LinearGradient>
           </AnimatedEntry>
         )}
 
+        {/* Language Selector */}
+        <AnimatedEntry index={0} staggerMs={40} trigger={focusTrigger}>
+          <View style={styles.themeToggleRow}>
+            <Text style={styles.themeToggleLabel}>{t('settings.language')}</Text>
+            <View style={styles.themeSelector}>
+              {SUPPORTED_LANGUAGES.map(({ code, label }) => (
+                <TouchableOpacity
+                  key={code}
+                  style={[
+                    styles.themeSelectorOption,
+                    styles.langSelectorOption,
+                    language === code && styles.themeSelectorOptionActive,
+                  ]}
+                  onPress={() => setLanguage(code)}
+                >
+                  <Text style={[styles.langOptionText, language === code && styles.langOptionTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </AnimatedEntry>
+
         {/* Theme Selector */}
         <AnimatedEntry index={0} staggerMs={40} trigger={focusTrigger}>
           <View style={styles.themeToggleRow}>
-            <Text style={styles.themeToggleLabel}>Appearance</Text>
+            <Text style={styles.themeToggleLabel}>{t('settings.appearance')}</Text>
             <View style={styles.themeSelector}>
               {([
                 { mode: 'system' as const, icon: 'monitor' },
@@ -198,13 +227,12 @@ export const SettingsScreen: React.FC = () => {
         <AttachStep index={5} fill>
           <View style={styles.navSection}>
             {[
-              { icon: 'sliders', title: 'Model Settings', desc: 'System prompt, generation, and performance', screen: 'ModelSettings' as const },
-              { icon: 'wifi', title: 'Remote Servers', desc: 'Connect to Ollama, LM Studio, and more', screen: 'RemoteServers' as const },
-            //  { icon: 'search', title: 'Web Search', desc: 'Configure search API key for reliable results', screen: 'WebSearchSettings' as const },
-              { icon: 'mic', title: 'Voice Transcription', desc: 'On-device speech to text', screen: 'VoiceSettings' as const },
-              { icon: 'lock', title: 'Security', desc: 'Passphrase and app lock', screen: 'SecuritySettings' as const },
-              { icon: 'smartphone', title: 'Device Information', desc: 'Hardware and compatibility', screen: 'DeviceInfo' as const },
-              { icon: 'hard-drive', title: 'Storage', desc: 'Models and data usage', screen: 'StorageSettings' as const },
+              { icon: 'sliders', title: t('settings.modelSettings'), desc: t('settings.modelSettingsDesc'), screen: 'ModelSettings' as const },
+              { icon: 'wifi', title: t('settings.remoteServers'), desc: t('settings.remoteServersDesc'), screen: 'RemoteServers' as const },
+              { icon: 'mic', title: t('settings.voiceTranscription'), desc: t('settings.voiceTranscriptionDesc'), screen: 'VoiceSettings' as const },
+              { icon: 'lock', title: t('settings.security'), desc: t('settings.securityDesc'), screen: 'SecuritySettings' as const },
+              { icon: 'smartphone', title: t('settings.deviceInfo'), desc: t('settings.deviceInfoDesc'), screen: 'DeviceInfo' as const },
+              { icon: 'hard-drive', title: t('settings.storage'), desc: t('settings.storageDesc'), screen: 'StorageSettings' as const },
             ].map((item, index, arr) => (
               <AnimatedListItem
                 key={item.screen}
@@ -239,12 +267,12 @@ export const SettingsScreen: React.FC = () => {
             </View>
             <View style={styles.proCardText}>
               <View style={styles.proTitleRow}>
-                <Text style={styles.proNavTitle}>Off Grid PRO</Text>
+                <Text style={styles.proNavTitle}>{t('settings.offGridPro')}</Text>
                 <View style={styles.proBadge}>
                   <Text style={styles.proBadgeText}>PRO</Text>
                 </View>
               </View>
-              <Text style={styles.proDesc}>Unlock premium features</Text>
+              <Text style={styles.proDesc}>{t('settings.unlockPremiumFeatures')}</Text>
             </View>
             <Icon name="chevron-right" size={16} color={colors.textMuted} />
           </TouchableOpacity>
@@ -258,8 +286,8 @@ export const SettingsScreen: React.FC = () => {
                 <Icon name="star" size={16} color={colors.textSecondary} />
               </View>
               <View style={styles.navItemContent}>
-                <Text style={styles.navItemTitle}>Star on GitHub</Text>
-                <Text style={styles.navItemDesc}>Support the open-source project</Text>
+                <Text style={styles.navItemTitle}>{t('settings.starOnGithub')}</Text>
+                <Text style={styles.navItemDesc}>{t('settings.supportOpenSource')}</Text>
               </View>
               <Icon name="external-link" size={14} color={colors.textMuted} />
             </TouchableOpacity>
@@ -268,8 +296,8 @@ export const SettingsScreen: React.FC = () => {
                 <Icon name="mail" size={16} color={colors.textSecondary} />
               </View>
               <View style={styles.navItemContent}>
-                <Text style={styles.navItemTitle}>Send Feedback</Text>
-                <Text style={styles.navItemDesc}>Report a bug or share a suggestion</Text>
+                <Text style={styles.navItemTitle}>{t('settings.sendFeedback')}</Text>
+                <Text style={styles.navItemDesc}>{t('settings.reportBugOrSuggestion')}</Text>
               </View>
               <Icon name="external-link" size={14} color={colors.textMuted} />
             </TouchableOpacity>
@@ -278,8 +306,8 @@ export const SettingsScreen: React.FC = () => {
                 <Icon name="share-2" size={16} color={colors.textSecondary} />
               </View>
               <View style={styles.navItemContent}>
-                <Text style={styles.navItemTitle}>Share on X</Text>
-                <Text style={styles.navItemDesc}>Tell others about Off Grid</Text>
+                <Text style={styles.navItemTitle}>{t('settings.shareOnX')}</Text>
+                <Text style={styles.navItemDesc}>{t('settings.tellOthersAboutOffGrid')}</Text>
               </View>
               <Icon name="external-link" size={14} color={colors.textMuted} />
             </TouchableOpacity>
@@ -294,8 +322,8 @@ export const SettingsScreen: React.FC = () => {
                 <Icon name="info" size={16} color={colors.textSecondary} />
               </View>
               <View style={styles.navItemContent}>
-                <Text style={styles.navItemTitle}>About</Text>
-                <Text style={styles.navItemDesc}>Version {packageJson.version}</Text>
+                <Text style={styles.navItemTitle}>{t('settings.about')}</Text>
+                <Text style={styles.navItemDesc}>{t('about.version', { version: packageJson.version })}</Text>
               </View>
               <Icon name="chevron-right" size={16} color={colors.textMuted} />
             </TouchableOpacity>
@@ -308,11 +336,8 @@ export const SettingsScreen: React.FC = () => {
             <View style={styles.privacyIconContainer}>
               <Icon name="shield" size={18} color={colors.textSecondary} />
             </View>
-            <Text style={styles.privacyTitle}>Privacy First</Text>
-            <Text style={styles.privacyText}>
-              All your data stays on this device. No conversations, prompts, or
-              personal information is ever sent to any server.
-            </Text>
+            <Text style={styles.privacyTitle}>{t('settings.privacyFirst')}</Text>
+            <Text style={styles.privacyText}>{t('settings.privacyDescription')}</Text>
           </Card>
         </AnimatedEntry>
 
@@ -321,11 +346,11 @@ export const SettingsScreen: React.FC = () => {
           <View style={styles.devButtonGroup}>
             <TouchableOpacity style={styles.devButton} onPress={handleResetOnboarding}>
               <Icon name="rotate-ccw" size={14} color={colors.textMuted} />
-              <Text style={styles.devButtonText}>Reset Onboarding</Text>
+              <Text style={styles.devButtonText}>{t('settings.resetOnboarding')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.devButton} onPress={resetChecklist}>
               <Icon name="list" size={14} color={colors.textMuted} />
-              <Text style={styles.devButtonText}>Reset Onboarding Checklist</Text>
+              <Text style={styles.devButtonText}>{t('settings.resetOnboardingChecklist')}</Text>
             </TouchableOpacity>
           </View>
         </AnimatedEntry>
@@ -353,6 +378,9 @@ const createStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   themeSelector: { flexDirection: 'row' as const, backgroundColor: colors.surfaceLight, borderRadius: 8, padding: 3, gap: 2 },
   themeSelectorOption: { width: 34, height: 30, borderRadius: 6, alignItems: 'center' as const, justifyContent: 'center' as const },
   themeSelectorOptionActive: { backgroundColor: colors.primary },
+  langSelectorOption: { width: 'auto' as const, paddingHorizontal: SPACING.sm },
+  langOptionText: { ...TYPOGRAPHY.bodySmall, color: colors.textMuted },
+  langOptionTextActive: { color: colors.background },
   navSection: {
     backgroundColor: colors.surface,
     borderRadius: 8,

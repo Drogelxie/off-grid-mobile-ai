@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Linking, ScrollView, Image, StyleSheet } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
 import { SPACING, TYPOGRAPHY } from '../constants';
@@ -15,6 +16,7 @@ import packageJson from '../../package.json';
 const WEDNESDAY_MOBILE_URL = 'https://mobile.wednesday.is/hire-ai-native-mobile-squad?utm_source=off-grid-mobile-app&utm_medium=about-screen&utm_campaign=in-app';
 
 export const AboutScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -26,7 +28,7 @@ export const AboutScreen: React.FC = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>About</Text>
+        <Text style={styles.headerTitle}>{t('about.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -35,10 +37,8 @@ export const AboutScreen: React.FC = () => {
         <View style={styles.heroSection}>
           <Image source={require('../assets/logo.png')} style={staticStyles.appIcon} />
           <Text style={styles.appName}>Off Grid</Text>
-          <Text style={styles.version}>Version {packageJson.version}</Text>
-          <Text style={styles.description}>
-            Local AI that runs entirely on your phone. No cloud, no telemetry, nothing leaves the device.
-          </Text>
+          <Text style={styles.version}>{t('about.version', { version: packageJson.version })}</Text>
+          <Text style={styles.description}>{t('about.description')}</Text>
         </View>
 
         {/* Open Source row */}
@@ -54,8 +54,8 @@ export const AboutScreen: React.FC = () => {
               <Icon name="github" size={16} color={colors.textSecondary} />
             </View>
             <View style={styles.navItemContent}>
-              <Text style={styles.navItemTitle}>Open Source</Text>
-              <Text style={styles.navItemDesc}>View the source on GitHub</Text>
+              <Text style={styles.navItemTitle}>{t('about.openSource')}</Text>
+              <Text style={styles.navItemDesc}>{t('about.openSourceDesc')}</Text>
             </View>
             <Icon name="external-link" size={14} color={colors.textMuted} />
           </AnimatedListItem>
@@ -74,8 +74,8 @@ export const AboutScreen: React.FC = () => {
               <Image source={require('../assets/wednesday_logo.png')} style={styles.wednesdayLogo} />
             </View>
             <View style={styles.navItemContent}>
-              <Text style={styles.navItemTitle}>Built by Wednesday</Text>
-              <Text style={styles.navItemDesc}>We build mobile apps for enterprise teams</Text>
+              <Text style={styles.navItemTitle}>{t('about.builtBy')}</Text>
+              <Text style={styles.navItemDesc}>{t('about.builtByDesc')}</Text>
             </View>
             <Icon name="external-link" size={14} color={colors.textMuted} />
           </AnimatedListItem>
