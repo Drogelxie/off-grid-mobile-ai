@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Off Grid AI - UI Preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a14;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #E8E8F0;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+  }
+  h1 { font-size: 13px; color: #5858A0; letter-spacing: 1px; text-transform: uppercase; text-align: center; }
+
+  /* Phone frame */
+  .phone {
+    width: 375px;
+    min-height: 600px;
+    background: #0D0D1A;
+    border-radius: 40px;
+    border: 2px solid #252547;
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(167,139,250,0.12);
+    position: relative;
+  }
+  .phone-label {
+    font-size: 11px;
+    color: #5858A0;
+    text-align: center;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .phone-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid #252547;
+    gap: 8px;
+  }
+  .phone-header .back { color: #E8E8F0; font-size: 20px; }
+  .phone-header .title { font-size: 20px; font-weight: 600; color: #E8E8F0; }
+
+  /* Colors */
+  :root {
+    --bg: #0D0D1A;
+    --surface: #1A1A2E;
+    --surface-light: #252547;
+    --primary: #A78BFA;
+    --secondary: #34D399;
+    --accent: #FBBF24;
+    --info: #38BDF8;
+    --text: #E8E8F0;
+    --text-sec: #9898B8;
+    --text-muted: #5858A0;
+    --border: #2A2A4A;
+    --error: #F87171;
+  }
+
+  /* Scroll content */
+  .screen-content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* Info cards */
+  .info-card {
+    background: var(--surface-light);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .info-card.accent-green { border-left: 3px solid var(--secondary); }
+  .info-card.accent-blue  { border-left: 3px solid var(--info); }
+  .info-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .info-card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .info-card-body  { font-size: 13px; color: var(--text-sec); line-height: 1.55; }
+  .info-card-body .code {
+    font-family: monospace;
+    color: var(--primary);
+    background: rgba(167,139,250,0.12);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+
+  /* Server card */
+  .server-card {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .server-name { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .server-url  { font-size: 13px; color: var(--text-sec); }
+  .server-status { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--secondary); }
+  .dot.gray { background: var(--text-muted); }
+  .status-text { font-size: 12px; color: var(--text-sec); }
+  .server-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .action-btn {
+    flex: 1; padding: 8px 12px; border-radius: 8px;
+    background: var(--surface-light); border: none;
+    font-size: 13px; color: var(--text); cursor: pointer; text-align: center;
+  }
+  .action-btn.danger { color: var(--error); background: rgba(248,113,113,0.1); }
+
+  /* Buttons */
+  .btn-primary {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: linear-gradient(90deg, #7C3AED, #4F46E5);
+    color: #fff; border: none; border-radius: 12px;
+    padding: 14px 20px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%;
+  }
+  .btn-scan {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--surface-light); color: var(--text); border: none; border-radius: 12px;
+    padding: 14px 20px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%;
+  }
+
+  /* Help panel */
+  .help-toggle {
+    display: flex; align-items: center; gap: 4px;
+    color: var(--primary); font-size: 12px; cursor: pointer;
+    margin-top: 8px; background: none; border: none; padding: 0;
+  }
+  .help-toggle svg { transition: transform 0.2s; }
+  .help-toggle.open svg { transform: rotate(180deg); }
+  .help-panel {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 8px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .help-panel.visible { display: flex; }
+  .help-scenario-header {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+  }
+  .help-scenario-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .help-step { font-size: 12px; color: var(--text-sec); line-height: 1.6; padding-left: 4px; }
+  .help-divider { height: 1px; background: var(--border); }
+  .icon-wifi { color: var(--secondary); font-size: 13px; }
+  .icon-shield { color: var(--info); font-size: 13px; }
+
+  /* Input field */
+  .form-label { font-size: 14px; font-weight: 600; color: var(--text-sec); margin-bottom: 6px; margin-top: 16px; }
+  .form-input {
+    background: var(--surface-light); border-radius: 12px;
+    padding: 12px 16px; font-size: 16px; color: var(--text);
+    border: none; width: 100%; outline: none;
+  }
+  .form-helper { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  /* Home screen */
+  .home-title { font-size: 32px; font-weight: 600; color: var(--text); }
+  .home-title .accent { color: var(--primary); }
+  .home-stat-row { display: flex; gap: 10px; margin-top: 12px; }
+  .stat-card {
+    flex: 1; background: var(--surface); border-radius: 16px; padding: 14px;
+  }
+  .stat-val { font-size: 22px; font-weight: 600; color: var(--primary); }
+  .stat-label { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .model-card {
+    background: var(--surface); border-radius: 16px; padding: 14px;
+    margin-top: 12px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .model-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .model-sub  { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  .badge {
+    font-size: 10px; padding: 3px 8px; border-radius: 20px;
+    background: rgba(167,139,250,0.2); color: var(--primary); font-weight: 600;
+  }
+  .badge.green { background: rgba(52,211,153,0.2); color: var(--secondary); }
+  .home-chat-btn {
+    background: linear-gradient(90deg, #7C3AED, #4F46E5);
+    border-radius: 12px; padding: 14px 20px; margin-top: 16px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  .crown-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1px solid var(--accent); border-radius: 20px;
+    padding: 3px 10px; font-size: 11px; color: var(--accent);
+    margin-left: 8px;
+  }
+
+  /* Onboarding */
+  .onboarding { background: var(--bg); padding: 40px 24px 32px; }
+  .slide-accent-line { height: 3px; border-radius: 2px; width: 48px; margin-bottom: 20px; }
+  .slide-keyword { font-size: 52px; font-weight: 600; letter-spacing: 4px; line-height: 1.1; }
+  .slide-title { font-size: 26px; font-weight: 600; color: var(--text); margin-top: 16px; line-height: 1.35; }
+  .slide-desc { font-size: 15px; color: var(--text-sec); margin-top: 12px; line-height: 1.6; }
+  .dots { display: flex; gap: 6px; margin-top: 24px; }
+  .dot-slide { width: 6px; height: 6px; border-radius: 50%; background: var(--surface-light); }
+  .dot-slide.active { background: var(--primary); width: 18px; border-radius: 3px; }
+
+  /* Palette swatch */
+  .palette { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 8px 0; }
+  .swatch { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; }
+  .swatch span { font-size: 9px; color: rgba(255,255,255,0.7); }
+</style>
+</head>
+<body>
+
+<h1>Off Grid AI — UI Preview nach Redesign</h1>
+
+<!-- PALETTE -->
+<div>
+  <div class="phone-label">Aurora Farbpalette</div>
+  <div class="palette">
+    <div class="swatch" style="background:#A78BFA"><span>violet</span></div>
+    <div class="swatch" style="background:#34D399"><span>emerald</span></div>
+    <div class="swatch" style="background:#FBBF24"><span>amber</span></div>
+    <div class="swatch" style="background:#38BDF8"><span>cyan</span></div>
+    <div class="swatch" style="background:#0D0D1A; border:1px solid #252547"><span>bg</span></div>
+    <div class="swatch" style="background:#1A1A2E"><span>surface</span></div>
+    <div class="swatch" style="background:#252547"><span>light</span></div>
+  </div>
+</div>
+
+<!-- HOME SCREEN -->
+<div>
+  <div class="phone-label">Home Screen</div>
+  <div class="phone">
+    <div style="padding: 20px 16px 0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div class="home-title"><span class="accent">Off</span> Grid</div>
+          <div style="font-size:13px;color:var(--text-sec);margin-top:4px;">3 models downloaded</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div class="crown-badge">
+            <span style="color:var(--accent)">★</span> Pro
+          </div>
+        </div>
+      </div>
+      <div class="home-stat-row">
+        <div class="stat-card">
+          <div class="stat-val">42</div>
+          <div class="stat-label">Conversations</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">3</div>
+          <div class="stat-label">Models</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">5</div>
+          <div class="stat-label">Projects</div>
+        </div>
+      </div>
+      <div class="model-card">
+        <div>
+          <div class="model-name">Llama 3.2 3B</div>
+          <div class="model-sub">Active model</div>
+        </div>
+        <div class="badge">Local</div>
+      </div>
+      <div class="model-card" style="margin-top:8px;">
+        <div>
+          <div class="model-name">Mistral 7B Q4</div>
+          <div class="model-sub">Downloaded</div>
+        </div>
+        <div class="badge green">Ready</div>
+      </div>
+      <div class="home-chat-btn">
+        <span>✦</span> New Chat
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARDING -->
+<div>
+  <div class="phone-label">Onboarding — Slide 1 (Violet)</div>
+  <div class="phone">
+    <div class="onboarding">
+      <div class="slide-accent-line" style="background: linear-gradient(90deg,#7C3AED,#4F46E5)"></div>
+      <div class="slide-keyword" style="color:#A78BFA">PRIVATE</div>
+      <div class="slide-title">Your AI runs in your phone's RAM</div>
+      <div class="slide-desc">No account. No server. No data leaving the device. The model runs locally - inference happens in your phone's RAM, nothing is sent anywhere.</div>
+      <div class="dots">
+        <div class="dot-slide active"></div>
+        <div class="dot-slide"></div>
+        <div class="dot-slide"></div>
+        <div class="dot-slide"></div>
+      </div>
+      <div class="btn-primary" style="margin-top:24px;">Next</div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <div class="phone-label">Onboarding — Slide 2 (Emerald)</div>
+  <div class="phone">
+    <div class="onboarding">
+      <div class="slide-accent-line" style="background: linear-gradient(90deg,#10B981,#0D9488)"></div>
+      <div class="slide-keyword" style="color:#34D399">LOCAL</div>
+      <div class="slide-title">15-30 tok/s on flagship devices</div>
+      <div class="slide-desc">Quantized models run at full speed on modern chips. No internet connection required - works on planes, in the mountains, anywhere.</div>
+      <div class="dots">
+        <div class="dot-slide"></div>
+        <div class="dot-slide active" style="background:var(--secondary)"></div>
+        <div class="dot-slide"></div>
+        <div class="dot-slide"></div>
+      </div>
+      <div class="btn-primary" style="margin-top:24px;background:linear-gradient(90deg,#10B981,#0D9488)">Next</div>
+    </div>
+  </div>
+</div>
+
+<!-- REMOTE SERVERS SCREEN -->
+<div>
+  <div class="phone-label">Remote Servers — leere Liste</div>
+  <div class="phone">
+    <div class="phone-header">
+      <span class="back">‹</span>
+      <span class="title">Remote Servers</span>
+    </div>
+    <div class="screen-content">
+      <div style="text-align:center;padding:24px 0 12px;">
+        <div style="width:64px;height:64px;border-radius:32px;background:var(--surface-light);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+          <span style="font-size:28px;color:var(--text-muted)">⌁</span>
+        </div>
+        <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:6px;">No Remote Servers</div>
+        <div style="font-size:14px;color:var(--text-sec);padding:0 32px;">Connect to Ollama, LM Studio, or other LLM servers on your network</div>
+      </div>
+      <button class="btn-primary">+ Add Server</button>
+      <button class="btn-scan">⌁ Scan Network</button>
+
+      <!-- Existing info card -->
+      <div class="info-card" style="margin-top:4px;">
+        <div class="info-card-title">About Remote Servers</div>
+        <div class="info-card-body">
+          Connect to LLM servers running on your local network, such as Ollama or LM Studio.<br><br>
+          Make sure your server is running and accessible from your device. For security, only connect to servers on trusted networks.
+        </div>
+      </div>
+
+      <!-- NEW: PC Agent card -->
+      <div class="info-card accent-green">
+        <div class="info-card-header">
+          <span style="color:var(--secondary);font-size:16px;">📁</span>
+          <span class="info-card-title" style="margin-bottom:0;">Work with Files on Your PC</span>
+        </div>
+        <div class="info-card-body">
+          Run an agent on your PC - Open WebUI, LangChain, or a similar framework - that has access to a folder on that machine. Add it here as a regular server.<br><br>
+          The agent reads and writes files on the PC directly. The app acts as the chat interface; all file operations happen on the PC side. No Android file access needed.<br><br>
+          Example: Ollama + Open WebUI on your PC with a folder tool configured. The AI can read, create, and edit files in that folder. The files never leave your local network.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REMOTE SERVERS mit Server -->
+<div>
+  <div class="phone-label">Remote Servers — mit gespeichertem Server</div>
+  <div class="phone">
+    <div class="phone-header">
+      <span class="back">‹</span>
+      <span class="title">Remote Servers</span>
+    </div>
+    <div class="screen-content">
+      <div class="server-card">
+        <div class="server-name">Home Ollama</div>
+        <div class="server-url">http://192.168.1.50:11434</div>
+        <div class="server-status">
+          <div class="dot"></div>
+          <span class="status-text">Connected</span>
+        </div>
+        <div class="server-actions">
+          <button class="action-btn">↺ Test</button>
+          <button class="action-btn">✎ Edit</button>
+          <button class="action-btn danger">🗑 Delete</button>
+        </div>
+      </div>
+      <div class="server-card">
+        <div class="server-name">Tailscale PC</div>
+        <div class="server-url">http://100.88.12.5:11434</div>
+        <div class="server-status">
+          <div class="dot gray"></div>
+          <span class="status-text">Unknown</span>
+        </div>
+        <div class="server-actions">
+          <button class="action-btn">↺ Test</button>
+          <button class="action-btn">✎ Edit</button>
+          <button class="action-btn danger">🗑 Delete</button>
+        </div>
+      </div>
+      <button class="btn-primary">+ Add Another Server</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD SERVER MODAL -->
+<div>
+  <div class="phone-label">Add Server Modal — Hilfe-Panel aufgeklappt</div>
+  <div class="phone">
+    <div class="phone-header">
+      <span class="back">‹</span>
+      <span class="title">Add Remote Server</span>
+      <span style="margin-left:auto;font-size:15px;color:var(--primary);">Done</span>
+    </div>
+    <div class="screen-content" style="padding-top:8px;">
+      <div class="form-label">Server Name</div>
+      <input class="form-input" placeholder="e.g., Ollama Desktop" readonly>
+
+      <div class="form-label">Endpoint URL</div>
+      <input class="form-input" value="http://100.88.12.5:11434" readonly>
+      <div class="form-helper">Will connect to: http://100.88.12.5:11434/v1/models</div>
+
+      <!-- Help toggle (open state) -->
+      <button class="help-toggle open" onclick="toggleHelp(this)" style="display:flex;align-items:center;gap:4px;background:none;border:none;color:var(--primary);font-size:12px;cursor:pointer;margin-top:8px;padding:0;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+        Hide setup help
+      </button>
+
+      <!-- Help panel (visible) -->
+      <div class="help-panel visible" id="help-panel">
+        <div>
+          <div class="help-scenario-header">
+            <span style="color:var(--secondary);font-size:14px;">⌁</span>
+            <span class="help-scenario-title">Same WiFi network</span>
+          </div>
+          <div class="help-step">1. Find your PC's local IP address:</div>
+          <div class="help-step">&nbsp;&nbsp;&nbsp;Windows: run <span style="font-family:monospace;color:var(--primary);background:rgba(167,139,250,0.12);padding:1px 4px;border-radius:3px;font-size:11px;">ipconfig</span> — look for IPv4 Address</div>
+          <div class="help-step">&nbsp;&nbsp;&nbsp;Mac / Linux: run <span style="font-family:monospace;color:var(--primary);background:rgba(167,139,250,0.12);padding:1px 4px;border-radius:3px;font-size:11px;">ip addr</span></div>
+          <div class="help-step">2. Use that IP with the server port:</div>
+          <div class="help-step">&nbsp;&nbsp;&nbsp;Ollama: <span style="font-family:monospace;color:var(--primary);font-size:11px;">http://192.168.1.X:11434</span></div>
+          <div class="help-step">&nbsp;&nbsp;&nbsp;LM Studio: <span style="font-family:monospace;color:var(--primary);font-size:11px;">http://192.168.1.X:1234</span></div>
+        </div>
+        <div class="help-divider"></div>
+        <div>
+          <div class="help-scenario-header">
+            <span style="color:var(--info);font-size:14px;">🛡</span>
+            <span class="help-scenario-title">Outside your home - secure with Tailscale</span>
+          </div>
+          <div class="help-step">1. Install Tailscale on your PC and this phone (tailscale.com - free)</div>
+          <div class="help-step">2. Sign in with the same account on both devices</div>
+          <div class="help-step">3. Your PC gets a Tailscale IP starting with <span style="font-family:monospace;color:var(--primary);font-size:11px;">100.</span></div>
+          <div class="help-step">4. Use that IP here: <span style="font-family:monospace;color:var(--primary);font-size:11px;">http://100.X.X.X:11434</span></div>
+          <div class="help-step">&nbsp;&nbsp;&nbsp;Encrypted via WireGuard. No port forwarding needed.</div>
+        </div>
+      </div>
+
+      <div class="form-label">API Key (Optional)</div>
+      <input class="form-input" placeholder="sk-..." type="password" readonly>
+      <div class="form-helper">Stored in the device keychain. Required for some servers - check your server's settings.</div>
+
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button style="flex:1;background:var(--primary);color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;">Test Connection</button>
+        <button style="flex:1;background:var(--surface-light);color:var(--text-muted);border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;">Add Server</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleHelp(btn) {
+  const panel = document.getElementById('help-panel');
+  const isOpen = panel.classList.contains('visible');
+  panel.classList.toggle('visible', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+  btn.querySelector('svg').style.transform = isOpen ? '' : 'rotate(180deg)';
+  btn.lastChild.textContent = isOpen ? ' How do I find the address?' : ' Hide setup help';
+}
+</script>
+</body>
+</html>
