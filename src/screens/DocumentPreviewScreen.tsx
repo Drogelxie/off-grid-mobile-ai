@@ -185,7 +185,7 @@ export const DocumentPreviewScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [filePath, fileName]);
+  }, [filePath, fileName, t]);
 
   useEffect(() => {
     loadContent();

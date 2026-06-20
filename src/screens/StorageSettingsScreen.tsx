@@ -82,7 +82,7 @@ export const StorageSettingsScreen: React.FC = () => {
         ],
       ),
     );
-  }, [staleDownloads, removeFromStore]);
+  }, [staleDownloads, removeFromStore, t]);
 
   const totalStorage = storageUsed + availableStorage;
   const usedPercentage = totalStorage > 0 ? (storageUsed / totalStorage) * 100 : 0;

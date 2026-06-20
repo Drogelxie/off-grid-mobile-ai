@@ -62,7 +62,7 @@ export const RemoteServersScreen: React.FC = () => {
     } finally {
       setTestingId(null);
     }
-  }, [testConnection]);
+  }, [testConnection, t]);
 
   const handleScanNetwork = useCallback(async () => {
     setIsScanning(true);
@@ -95,7 +95,7 @@ export const RemoteServersScreen: React.FC = () => {
     } finally {
       setIsScanning(false);
     }
-  }, [servers]);
+  }, [servers, t]);
 
   const handleDeleteServer = useCallback((server: typeof servers[0]) => {
     setAlertState(showAlert(
@@ -113,7 +113,7 @@ export const RemoteServersScreen: React.FC = () => {
         },
       ]
     ));
-  }, [activeServerId, setActiveServerId]);
+  }, [activeServerId, setActiveServerId, t]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

@@ -103,7 +103,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
     } finally {
       setIsVerifying(false);
     }
-  }, [passphrase, checkLockout, failedAttempts, recordFailedAttempt, resetFailedAttempts, onUnlock]);
+  }, [passphrase, checkLockout, failedAttempts, recordFailedAttempt, resetFailedAttempts, onUnlock, t]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
