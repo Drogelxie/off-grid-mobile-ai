@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceInfo, DownloadedModel, ModelRecommendation, ONNXImageModel, ImageGenerationMode, AutoDetectMethod, ModelLoadingStrategy, CacheType, InferenceBackend, INFERENCE_BACKENDS, LiteRTBackend, GeneratedImage } from '../types';
+import type { LanguageCode } from '../i18n';
 
 function isUnknownLike(value: string): boolean {
   const normalized = value.trim().toLowerCase();
@@ -51,6 +52,8 @@ type ThemeMode = 'system' | 'light' | 'dark';
 interface AppState {
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
+  language: LanguageCode;
+  setLanguage: (code: LanguageCode) => void;
   hasCompletedOnboarding: boolean;
   setOnboardingComplete: (complete: boolean) => void;
   onboardingChecklist: OnboardingChecklist;
@@ -201,6 +204,8 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       themeMode: 'system' as ThemeMode,
       setThemeMode: (mode) => set({ themeMode: mode }),
+      language: 'en' as LanguageCode,
+      setLanguage: (code) => set({ language: code }),
       hasCompletedOnboarding: false,
       setOnboardingComplete: (complete) =>
         set({ hasCompletedOnboarding: complete }),
@@ -319,6 +324,7 @@ export const useAppStore = create<AppState>()(
       merge: migratePersistedState,
       partialize: (state) => ({
         themeMode: state.themeMode,
+        language: state.language,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         onboardingChecklist: state.onboardingChecklist,
         checklistDismissed: state.checklistDismissed,

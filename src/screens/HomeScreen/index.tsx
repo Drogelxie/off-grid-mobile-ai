@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, CustomAlert, hideAlert } from '../../components';
 import { AnimatedEntry } from '../../components/AnimatedEntry';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
@@ -24,6 +25,7 @@ type HomeScreenProps = {
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const { t } = useTranslation();
   const focusTrigger = useFocusTrigger();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -79,11 +81,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Text style={styles.title}>Off Grid</Text>
+              <Text style={styles.title}>
+                <Text style={styles.titleAccent}>Off</Text>
+                {' Grid'}
+              </Text>
               {showIcon && <PulsatingIcon onPress={openSheet} />}
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('ProDetail')} hitSlop={8} style={styles.crownButton}>
-              <IconMC name="crown" size={16} color={colors.primary} />
+              <IconMC name="crown" size={16} color={colors.accent} />
             </TouchableOpacity>
           </View>
 
@@ -112,7 +117,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           {
             (activeTextModel || activeImageModelId) ? (
               <Button
-                title="New Chat"
+                title={t('home.newChat')}
+                variant="gradient"
                 onPress={startNewChat}
                 style={styles.newChatButton}
                 testID="new-chat-button"
@@ -121,19 +127,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Card style={styles.setupCard} testID="setup-card">
                 <Text style={styles.setupText}>
                   {downloadedModels.length > 0 || remoteTextModels.length > 0
-                    ? 'Select a text or image model to start'
-                    : 'Add a remote server or download a model to start chatting'}
+                    ? t('home.selectModelToStart')
+                    : t('home.addRemoteOrDownload')}
                 </Text>
                 <View style={styles.setupActions}>
                   <Button
-                    title="Add Remote Server"
+                    title={t('home.addRemoteServer')}
                     variant="outline"
                     size="small"
                     onPress={() => navigation.navigate('RemoteServers')}
                     testID="add-server-button"
                   />
                   <Button
-                    title={downloadedModels.length > 0 || remoteTextModels.length > 0 ? 'Select Model' : 'Browse Models'}
+                    title={downloadedModels.length > 0 || remoteTextModels.length > 0 ? t('home.selectModel') : t('home.browseModels')}
                     variant="outline"
                     size="small"
                     onPress={() => downloadedModels.length > 0 || remoteTextModels.length > 0 ? setPickerType('text') : navigation.navigate('ModelsTab', { initialTab: 'text' })}
@@ -167,7 +173,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           >
             <Icon name="grid" size={18} color={colors.primary} />
             <View style={styles.galleryCardInfo}>
-              <Text style={styles.galleryCardTitle}>Image Gallery</Text>
+              <Text style={styles.galleryCardTitle}>{t('home.imageGallery')}</Text>
               <Text style={styles.galleryCardMeta}>
                 {generatedImages.length} {generatedImages.length === 1 ? 'image' : 'images'}
               </Text>

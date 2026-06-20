@@ -174,11 +174,26 @@ export function createStyles(colors: ThemeColors, _shadows: ThemeShadows) {
       padding: 16,
       marginTop: 16,
     },
+    infoCardAgent: {
+      borderLeftWidth: 3,
+      borderLeftColor: colors.secondary,
+    },
+    infoCardHeader: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: 8,
+      marginBottom: 8,
+    },
     infoTitle: {
       fontSize: 14,
       fontWeight: '600' as const,
       color: colors.text,
       marginBottom: 8,
+    },
+    infoTitleInline: {
+      fontSize: 14,
+      fontWeight: '600' as const,
+      color: colors.text,
     },
     infoText: {
       fontSize: 13,

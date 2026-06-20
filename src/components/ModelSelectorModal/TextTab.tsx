@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { useTheme, useThemedStyles } from '../../theme';
 import { DownloadedModel, RemoteModel } from '../../types';
 import { hardwareService } from '../../services';
@@ -24,6 +25,7 @@ export const TextTab: React.FC<TextTabProps> = ({
 }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createAllStyles);
+  const { t } = useTranslation();
   const hasLoaded = currentModelPath !== null || currentRemoteModelId !== null;
   const activeLocalModel = downloadedModels.find(m => m.filePath === currentModelPath);
 
@@ -43,7 +45,7 @@ export const TextTab: React.FC<TextTabProps> = ({
         <View style={styles.loadedSection}>
           <View style={styles.loadedHeader}>
             <Icon name="check-circle" size={14} color={colors.success} />
-            <Text style={styles.loadedLabel}>Currently Loaded</Text>
+            <Text style={styles.loadedLabel}>{t('modelSelector.currentlyLoaded')}</Text>
           </View>
           <View style={styles.loadedModelItem}>
             <View style={styles.loadedModelInfo}>
@@ -58,29 +60,29 @@ export const TextTab: React.FC<TextTabProps> = ({
             </View>
             <TouchableOpacity style={styles.unloadButton} onPress={onUnloadModel} disabled={isAnyLoading}>
               <Icon name="power" size={16} color={colors.error} />
-              <Text style={styles.unloadButtonText}>Unload</Text>
+              <Text style={styles.unloadButtonText}>{t('modelSelector.unload')}</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>{hasLoaded ? 'Switch Model' : 'Available Models'}</Text>
+      <Text style={styles.sectionTitle}>{hasLoaded ? t('modelSelector.switchModel') : t('modelSelector.availableModels')}</Text>
 
       {/* Empty state when no models at all */}
       {downloadedModels.length === 0 && remoteModels.length === 0 && (
         <View style={styles.emptyState}>
           <Icon name="package" size={40} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>No Text Models</Text>
-          <Text style={styles.emptyText}>Download models from the Models tab</Text>
+          <Text style={styles.emptyTitle}>{t('modelSelector.noTextModels')}</Text>
+          <Text style={styles.emptyText}>{t('modelSelector.downloadFromModelsTab')}</Text>
           <View style={localStyles.emptyActions}>
             <TouchableOpacity style={[localStyles.actionButton, { borderColor: colors.border }]} onPress={onAddServer} disabled={isAnyLoading}>
               <Icon name="wifi" size={14} color={colors.textSecondary} />
-              <Text style={[localStyles.actionButtonText, { color: colors.textSecondary }]}>Add Remote Server</Text>
+              <Text style={[localStyles.actionButtonText, { color: colors.textSecondary }]}>{t('modelSelector.addRemoteServer')}</Text>
             </TouchableOpacity>
             {onBrowseModels && (
               <TouchableOpacity style={[localStyles.actionButton, { borderColor: colors.primary }]} onPress={onBrowseModels}>
                 <Icon name="download" size={14} color={colors.primary} />
-                <Text style={[localStyles.actionButtonText, { color: colors.primary }]}>Browse Models</Text>
+                <Text style={[localStyles.actionButtonText, { color: colors.primary }]}>{t('modelSelector.browseModels')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -92,7 +94,7 @@ export const TextTab: React.FC<TextTabProps> = ({
         <>
           <View style={styles.sectionHeaderRow}>
             <Icon name="hard-drive" size={14} color={colors.textMuted} />
-            <Text style={styles.sectionSubTitle}>Local Models</Text>
+            <Text style={styles.sectionSubTitle}>{t('modelSelector.localModels')}</Text>
           </View>
           {downloadedModels.map((model) => {
             const isCurrent = currentModelPath === model.filePath;

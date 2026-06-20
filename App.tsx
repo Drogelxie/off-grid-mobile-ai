@@ -14,6 +14,7 @@ import { useTheme } from './src/theme';
 import { hardwareService, modelManager, authService, ragService, remoteServerManager } from './src/services';
 import logger from './src/utils/logger';
 import { useAppStore, useAuthStore, useRemoteServerStore } from './src/stores';
+import i18n from './src/i18n';
 import { hydrateDownloadStore } from './src/services/downloadHydration';
 import { useDownloadListeners } from './src/hooks/useDownloads';
 import { LockScreen } from './src/screens';
@@ -37,6 +38,11 @@ function App() {
   const setModelRecommendation = useAppStore((s) => s.setModelRecommendation);
   const setDownloadedModels = useAppStore((s) => s.setDownloadedModels);
   const setDownloadedImageModels = useAppStore((s) => s.setDownloadedImageModels);
+  const language = useAppStore((s) => s.language);
+
+  useEffect(() => {
+    i18n.changeLanguage(language);
+  }, [language]);
 
   const { colors, isDark } = useTheme();
 

@@ -1,4 +1,5 @@
 export { MODEL_RECOMMENDATIONS, RECOMMENDED_MODELS, TRENDING_FAMILIES, TRENDING_MODEL_IDS, MODEL_ORGS, QUANTIZATION_INFO } from './models';
+export { GRADIENTS } from '../theme/palettes';
 
 // External URLs
 export const WEDNESDAY_URL = 'https://mobile.wednesday.is/hire-ai-native-mobile-squad?utm_source=off-grid-mobile-app&utm_medium=made-with-love&utm_campaign=in-app';
@@ -139,41 +140,42 @@ export const ONBOARDING_SLIDES = [
 // Fonts
 export const FONTS = {
   mono: 'Menlo',
+  system: undefined as undefined, // let RN pick the platform sans-serif
 };
 
-// Typography Scale - Centralized font sizes and styles
+// Typography Scale - Centralized font sizes and styles (Aurora design system)
 export const TYPOGRAPHY = {
-  // Display / Hero numbers
+  // Display / Hero — large section titles, stat numbers
   display: {
-    fontSize: 22,
+    fontSize: 32,
     fontFamily: FONTS.mono,
-    fontWeight: '200' as const,
-    letterSpacing: -0.5,
+    fontWeight: '600' as const,
+    letterSpacing: -1,
   },
 
   // Headings
   h1: {
-    fontSize: 24,
+    fontSize: 26,
     fontFamily: FONTS.mono,
-    fontWeight: '300' as const,
-    letterSpacing: -0.5,
+    fontWeight: '600' as const,
+    letterSpacing: -0.8,
   },
   h2: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: FONTS.mono,
-    fontWeight: '400' as const,
-    letterSpacing: -0.2,
+    fontWeight: '500' as const,
+    letterSpacing: -0.3,
   },
   h3: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: FONTS.mono,
-    fontWeight: '400' as const,
+    fontWeight: '500' as const,
     letterSpacing: -0.2,
   },
 
   // Body text
   body: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: FONTS.mono,
     fontWeight: '400' as const,
   },
@@ -183,30 +185,30 @@ export const TYPOGRAPHY = {
     fontWeight: '400' as const,
   },
 
-  // Labels (whispers)
+  // Labels (section chips, uppercase tags)
   label: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: FONTS.mono,
-    fontWeight: '400' as const,
-    letterSpacing: 0.3,
+    fontWeight: '500' as const,
+    letterSpacing: 0.8,
   },
   labelSmall: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: FONTS.mono,
-    fontWeight: '400' as const,
-    letterSpacing: 0.3,
+    fontWeight: '500' as const,
+    letterSpacing: 0.6,
   },
 
   // Metadata / Details
   meta: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: FONTS.mono,
-    fontWeight: '300' as const,
+    fontWeight: '400' as const,
   },
   metaSmall: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: FONTS.mono,
-    fontWeight: '300' as const,
+    fontWeight: '400' as const,
   },
 };
 

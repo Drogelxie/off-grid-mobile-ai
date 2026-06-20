@@ -3,24 +3,27 @@ import { View, Text, TouchableOpacity, ScrollView, Linking, StyleSheet } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { useTheme, useThemedStyles } from '../../theme';
 import type { ThemeColors, ThemeShadows } from '../../theme';
 import { SPACING, TYPOGRAPHY } from '../../constants';
 import { PRO_URL } from '../../utils/proPrompt';
 import { useAppStore } from '../../stores';
 
-const INTEGRATIONS = [
-  { icon: 'mic', title: 'Voice', desc: 'Local speech-to-text\nprocessing.' },
-  { icon: 'calendar', title: 'Calendar', desc: 'Seamless event\nscheduling.' },
-  { icon: 'mail', title: 'Email', desc: 'Private inbox\nsummarization.' },
-  { icon: 'message-square', title: 'Messaging', desc: 'Slack,\nTelegram & more.' },
-];
-
+const INTEGRATIONS_ICONS = ['mic', 'calendar', 'mail', 'message-square'];
 
 export const ProDetailScreen: React.FC = () => {
+  const { t } = useTranslation();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(createStyles);
   const setHasRegisteredPro = useAppStore((s) => s.setHasRegisteredPro);
+
+  const INTEGRATIONS = [
+    { icon: INTEGRATIONS_ICONS[0], title: t('proDetail.voice'), desc: t('proDetail.voiceDesc') },
+    { icon: INTEGRATIONS_ICONS[1], title: t('proDetail.calendar'), desc: t('proDetail.calendarDesc') },
+    { icon: INTEGRATIONS_ICONS[2], title: t('proDetail.email'), desc: t('proDetail.emailDesc') },
+    { icon: INTEGRATIONS_ICONS[3], title: t('proDetail.messaging'), desc: t('proDetail.messagingDesc') },
+  ];
 
   const handleCTA = () => {
     setHasRegisteredPro(true);
@@ -50,17 +53,15 @@ export const ProDetailScreen: React.FC = () => {
             <Text style={styles.logoText}>Off Grid Pro</Text>
           </View>
           <TouchableOpacity style={styles.getProButton} onPress={handleCTA}>
-            <Text style={styles.getProButtonText}>Get Pro</Text>
+            <Text style={styles.getProButtonText}>{t('proDetail.getPro')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Hero */}
         <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Technical Efficiency.</Text>
-          <Text style={styles.heroPrimary}>Privacy First.</Text>
-          <Text style={styles.heroSubtitle}>
-            Elevate your local AI workflow with premium integrations designed for power users.
-          </Text>
+          <Text style={styles.heroTitle}>{t('proDetail.heroTitle')}</Text>
+          <Text style={styles.heroPrimary}>{t('proDetail.heroPrimary')}</Text>
+          <Text style={styles.heroSubtitle}>{t('proDetail.heroSubtitle')}</Text>
         </View>
 
         {/* Promo Banner */}
@@ -73,17 +74,15 @@ export const ProDetailScreen: React.FC = () => {
           />
           <View style={styles.promoOfferRow}>
             <Icon name="star" size={13} color={colors.primary} />
-            <Text style={styles.promoOfferLabel}>LIMITED TIME OFFER</Text>
+            <Text style={styles.promoOfferLabel}>{t('proDetail.limitedTimeOffer')}</Text>
           </View>
-          <Text style={styles.promoTitle}>Lifetime PRO Access</Text>
-          <Text style={styles.promoSubtitle}>
-            Unlock all current and future integrations forever.
-          </Text>
+          <Text style={styles.promoTitle}>{t('proDetail.lifetimeAccess')}</Text>
+          <Text style={styles.promoSubtitle}>{t('proDetail.unlockAllIntegrations')}</Text>
         </View>
 
         {/* Core Integrations */}
         <View style={styles.integrationsSection}>
-          <Text style={styles.sectionLabel}>CORE INTEGRATIONS</Text>
+          <Text style={styles.sectionLabel}>{t('proDetail.coreIntegrations')}</Text>
 
           <View style={styles.gridRow}>
             {INTEGRATIONS.slice(0, 2).map(item => (
@@ -122,22 +121,21 @@ export const ProDetailScreen: React.FC = () => {
             </View>
             <View style={styles.mcpContent}>
               <View style={styles.mcpTitleRow}>
-                <Text style={styles.mcpTitle}>MCP Access</Text>
+                <Text style={styles.mcpTitle}>{t('proDetail.mcpAccess')}</Text>
                 <View style={styles.advancedBadge}>
-                  <Text style={styles.advancedBadgeText}>ADVANCED</Text>
+                  <Text style={styles.advancedBadgeText}>{t('proDetail.advanced')}</Text>
                 </View>
               </View>
-              <Text style={styles.mcpDesc}>
-                Full Model Context Protocol support for bespoke tool chaining and logic loops.
-              </Text>
+              <Text style={styles.mcpDesc}>{t('proDetail.mcpDesc')}</Text>
             </View>
           </View>
         </View>
 
         {/* CTA */}
         <TouchableOpacity style={styles.ctaButton} onPress={handleCTA}>
-          <Text style={styles.ctaText}>I am in 🔥</Text>
-         </TouchableOpacity>
+          <Text style={styles.ctaText}>{t('proDetail.iAmIn')}</Text>
+          <Icon name="zap" size={16} color="#FFFFFF" />
+        </TouchableOpacity>
 
       </ScrollView>
     </SafeAreaView>

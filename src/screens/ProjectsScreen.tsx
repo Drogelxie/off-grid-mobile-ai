@@ -21,6 +21,7 @@ import { useFocusTrigger } from '../hooks/useFocusTrigger';
 import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
 import { TYPOGRAPHY, SPACING } from '../constants';
+import { useTranslation } from 'react-i18next';
 import { useProjectStore, useChatStore } from '../stores';
 import { Project } from '../types';
 import { RootStackParamList, MainTabParamList } from '../navigation/types';
@@ -33,6 +34,7 @@ type NavigationProp = CompositeNavigationProp<
 export const ProjectsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const focusTrigger = useFocusTrigger();
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const { projects, deleteProject } = useProjectStore();
@@ -50,8 +52,8 @@ export const ProjectsScreen: React.FC = () => {
 
   const handleDeleteProject = (project: Project) => {
     setAlertState(showAlert(
-      'Delete Project',
-      `Delete "${project.name}"? This will not delete the chats associated with this project.`,
+      t('projects.delete'),
+      t('projects.deleteConfirm', { name: project.name }),
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -122,10 +124,10 @@ export const ProjectsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Projects</Text>
+        <Text style={styles.title}>{t('projects.title')}</Text>
         <AttachStep index={7}>
           <Button
-            title="New"
+            title={t('projects.new')}
             variant="primary"
             size="small"
             onPress={handleNewProject}
@@ -135,7 +137,7 @@ export const ProjectsScreen: React.FC = () => {
       </View>
 
       <Text style={styles.subtitle}>
-        Projects group related chats with shared context and instructions.
+        {t('projects.subtitle')}
       </Text>
 
       {projects.length === 0 ? (
@@ -146,11 +148,11 @@ export const ProjectsScreen: React.FC = () => {
             </View>
           </AnimatedEntry>
           <AnimatedEntry index={1} staggerMs={60} trigger={focusTrigger}>
-            <Text style={styles.emptyTitle}>No Projects Yet</Text>
+            <Text style={styles.emptyTitle}>{t('projects.noProjects')}</Text>
           </AnimatedEntry>
           <AnimatedEntry index={2} staggerMs={60} trigger={focusTrigger}>
             <Text style={styles.emptyText}>
-              Create a project to organize your chats by topic, like "Spanish Learning" or "Code Review".
+              {t('projects.createProjectHint')}
             </Text>
           </AnimatedEntry>
           <AnimatedEntry index={3} staggerMs={60} trigger={focusTrigger}>

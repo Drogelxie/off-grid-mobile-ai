@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { Button, Card } from '../components';
 import { CustomAlert, showAlert, hideAlert, AlertState, initialAlertState } from '../components/CustomAlert';
 import { useTheme, useThemedStyles } from '../theme';
@@ -35,6 +36,7 @@ export const PassphraseSetupScreen: React.FC<PassphraseSetupScreenProps> = ({
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [alertState, setAlertState] = useState<AlertState>(initialAlertState);
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -42,10 +44,10 @@ export const PassphraseSetupScreen: React.FC<PassphraseSetupScreenProps> = ({
 
   const validatePassphrase = (passphrase: string): string | null => {
     if (passphrase.length < 6) {
-      return 'Passphrase must be at least 6 characters';
+      return t('passphrase.tooShort');
     }
     if (passphrase.length > 50) {
-      return 'Passphrase must be 50 characters or less';
+      return t('passphrase.tooLong');
     }
     return null;
   };
@@ -60,7 +62,7 @@ export const PassphraseSetupScreen: React.FC<PassphraseSetupScreenProps> = ({
 
     // Check confirmation matches
     if (newPassphrase !== confirmPassphrase) {
-      setAlertState(showAlert('Mismatch', 'Passphrases do not match'));
+      setAlertState(showAlert(t('passphrase.mismatchTitle'), t('passphrase.mismatch')));
       return;
     }
 
@@ -71,21 +73,21 @@ export const PassphraseSetupScreen: React.FC<PassphraseSetupScreenProps> = ({
         // Verify current passphrase and change
         const success = await authService.changePassphrase(currentPassphrase, newPassphrase);
         if (!success) {
-          setAlertState(showAlert('Error', 'Current passphrase is incorrect'));
+          setAlertState(showAlert(t('common.error'), t('passphrase.currentIncorrect')));
           setIsSubmitting(false);
           return;
         }
-        setAlertState(showAlert('Success', 'Passphrase changed successfully'));
+        setAlertState(showAlert(t('common.success'), t('passphrase.successChanged')));
       } else {
         // Set new passphrase
         const success = await authService.setPassphrase(newPassphrase);
         if (!success) {
-          setAlertState(showAlert('Error', 'Failed to set passphrase'));
+          setAlertState(showAlert(t('common.error'), t('passphrase.failedToSet')));
           setIsSubmitting(false);
           return;
         }
         setEnabled(true);
-        setAlertState(showAlert('Success', 'Passphrase lock enabled'));
+        setAlertState(showAlert(t('common.success'), t('passphrase.successEnabled')));
       }
 
       onComplete();
@@ -108,7 +110,7 @@ export const PassphraseSetupScreen: React.FC<PassphraseSetupScreenProps> = ({
             <Text style={styles.cancelButton}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.title}>
-            {isChanging ? 'Change Passphrase' : 'Set Up Passphrase'}
+            {isChanging ? t('passphrase.changeTitle') : t('passphrase.setupTitle')}
           </Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -121,20 +123,18 @@ export const PassphraseSetupScreen: React.FC<PassphraseSetupScreenProps> = ({
           </View>
 
           <Text style={styles.description}>
-            {isChanging
-              ? 'Enter your current passphrase and then set a new one.'
-              : 'Create a passphrase to lock the app. You will need to enter it each time you open the app.'}
+            {isChanging ? t('passphrase.changeDescription') : t('passphrase.setupDescription')}
           </Text>
 
           <Card style={styles.inputCard}>
             {isChanging && (
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Current Passphrase</Text>
+                <Text style={styles.inputLabel}>{t('passphrase.currentPassphrase')}</Text>
                 <TextInput
                   style={styles.input}
                   value={currentPassphrase}
                   onChangeText={setCurrentPassphrase}
-                  placeholder="Enter current passphrase"
+                  placeholder={t('passphrase.currentPlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   secureTextEntry
                   autoCapitalize="none"
@@ -145,13 +145,13 @@ export const PassphraseSetupScreen: React.FC<PassphraseSetupScreenProps> = ({
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>
-                {isChanging ? 'New Passphrase' : 'Passphrase'}
+                {isChanging ? t('passphrase.newPassphrase') : t('passphrase.passphrase')}
               </Text>
               <TextInput
                 style={styles.input}
                 value={newPassphrase}
                 onChangeText={setNewPassphrase}
-                placeholder="Enter passphrase (min 6 characters)"
+                placeholder={t('passphrase.passphrasePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 secureTextEntry
                 autoCapitalize="none"
@@ -160,12 +160,12 @@ export const PassphraseSetupScreen: React.FC<PassphraseSetupScreenProps> = ({
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Confirm Passphrase</Text>
+              <Text style={styles.inputLabel}>{t('passphrase.confirmPassphrase')}</Text>
               <TextInput
                 style={styles.input}
                 value={confirmPassphrase}
                 onChangeText={setConfirmPassphrase}
-                placeholder="Re-enter passphrase"
+                placeholder={t('passphrase.confirmPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 secureTextEntry
                 autoCapitalize="none"
@@ -175,16 +175,16 @@ export const PassphraseSetupScreen: React.FC<PassphraseSetupScreenProps> = ({
           </Card>
 
           <View style={styles.tips}>
-            <Text style={styles.tipsTitle}>Tips for a good passphrase:</Text>
-            <Text style={styles.tipItem}>• Use a mix of words and numbers</Text>
-            <Text style={styles.tipItem}>• Make it memorable but not obvious</Text>
-            <Text style={styles.tipItem}>• Avoid personal information</Text>
+            <Text style={styles.tipsTitle}>{t('passphrase.tipsTitle')}</Text>
+            <Text style={styles.tipItem}>{t('passphrase.tip1')}</Text>
+            <Text style={styles.tipItem}>{t('passphrase.tip2')}</Text>
+            <Text style={styles.tipItem}>{t('passphrase.tip3')}</Text>
           </View>
 
           <Button
             title={(() => {
-              if (isSubmitting) return 'Saving...';
-              return isChanging ? 'Change Passphrase' : 'Enable Lock';
+              if (isSubmitting) return t('passphrase.saving');
+              return isChanging ? t('passphrase.changeButton') : t('passphrase.enableLock');
             })()}
             onPress={handleSubmit}
             disabled={isSubmitting}

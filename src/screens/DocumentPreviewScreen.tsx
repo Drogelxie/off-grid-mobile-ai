@@ -11,6 +11,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
 import RNFS from 'react-native-fs';
+import { useTranslation } from 'react-i18next';
 import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
 import { TYPOGRAPHY, SPACING } from '../constants';
@@ -106,6 +107,7 @@ export const DocumentPreviewScreen: React.FC = () => {
   const { filePath, fileName, fileSize } = route.params;
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const { t } = useTranslation();
 
   const [content, setContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,7 +162,7 @@ export const DocumentPreviewScreen: React.FC = () => {
 
       if (!foundPath) {
         logger.error('[DocumentPreview] File not found in any location');
-        setError('File not found. The document may have been stored in a previous app installation. Please re-upload the document.');
+        setError(t('documentPreview.notFound'));
         return;
       }
 
@@ -173,7 +175,7 @@ export const DocumentPreviewScreen: React.FC = () => {
         setContent(attachment.textContent);
       } else {
         logger.log('[DocumentPreview] No text content in attachment');
-        setError('Could not extract text from this document');
+        setError(t('documentPreview.extractionFailed'));
       }
     } catch (err: any) {
       logger.error('[DocumentPreview] ===== Error loading document =====');
@@ -202,7 +204,7 @@ export const DocumentPreviewScreen: React.FC = () => {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {fileName || 'Document'}
+            {fileName || t('documentPreview.title')}
           </Text>
           {fileSize > 0 && (
             <Text style={styles.headerSubtitle}>{formatFileSize(fileSize)}</Text>
@@ -213,7 +215,7 @@ export const DocumentPreviewScreen: React.FC = () => {
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.emptyText}>Loading document...</Text>
+          <Text style={styles.emptyText}>{t('documentPreview.loading')}</Text>
         </View>
       ) : error ? (
         <View style={styles.centered}>
@@ -227,7 +229,7 @@ export const DocumentPreviewScreen: React.FC = () => {
       ) : (
         <View style={styles.centered}>
           <Icon name="file-text" size={40} color={colors.textMuted} />
-          <Text style={styles.emptyText}>No content available</Text>
+          <Text style={styles.emptyText}>{t('documentPreview.noContent')}</Text>
         </View>
       )}
     </SafeAreaView>

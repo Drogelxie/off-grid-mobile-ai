@@ -14,6 +14,7 @@ import { Button } from '../components/Button';
 import { CustomAlert, showAlert, hideAlert, AlertState, initialAlertState } from '../components/CustomAlert';
 import { useTheme, useThemedStyles } from '../theme';
 import { createStyles } from './ProjectDetailScreen.styles';
+import { useTranslation } from 'react-i18next';
 import { useChatStore, useProjectStore, useAppStore } from '../stores';
 import { Conversation } from '../types';
 import { RootStackParamList } from '../navigation/types';
@@ -27,6 +28,7 @@ export const ProjectDetailScreen: React.FC = () => {
   const route = useRoute<RouteProps>();
   const { projectId } = route.params;
   const [alertState, setAlertState] = useState<AlertState>(initialAlertState);
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -49,7 +51,7 @@ export const ProjectDetailScreen: React.FC = () => {
 
   const handleNewChat = () => {
     if (!hasModels) {
-      setAlertState(showAlert('No Model', 'Please download a model first from the Models tab.'));
+      setAlertState(showAlert(t('projects.noModel'), t('projects.downloadModelFirst')));
       return;
     }
     const modelId = activeModelId || downloadedModels[0]?.id;
@@ -61,8 +63,8 @@ export const ProjectDetailScreen: React.FC = () => {
 
   const handleDeleteProject = () => {
     setAlertState(showAlert(
-      'Delete Project',
-      `Delete "${project?.name}"? This will not delete the chats associated with this project.`,
+      t('projects.delete'),
+      t('projects.deleteConfirm', { name: project?.name }),
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -155,9 +157,9 @@ export const ProjectDetailScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Project not found</Text>
+          <Text style={styles.errorText}>{t('projects.notFound')}</Text>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.errorLink}>Go back</Text>
+            <Text style={styles.errorLink}>{t('projects.goBack')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -205,14 +207,14 @@ export const ProjectDetailScreen: React.FC = () => {
             activeOpacity={0.7}
           >
             <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionTitle}>Chats</Text>
+              <Text style={styles.sectionTitle}>{t('common.chats')}</Text>
               {projectChats.length > 0 && (
                 <Text style={styles.sectionCount}>{projectChats.length}</Text>
               )}
             </View>
             <View style={styles.sectionActions}>
               <Button
-                title="New"
+                title={t('projects.new')}
                 variant="primary"
                 size="small"
                 onPress={handleNewChat}
@@ -232,10 +234,10 @@ export const ProjectDetailScreen: React.FC = () => {
             {projectChats.length === 0 ? (
               <View style={styles.emptyState}>
                 <Icon name="message-circle" size={24} color={colors.textMuted} />
-                <Text style={styles.emptyStateText}>No chats yet</Text>
+                <Text style={styles.emptyStateText}>{t('projects.noChats')}</Text>
                 {hasModels && (
                   <Button
-                    title="Start a Chat"
+                    title={t('projects.startChat')}
                     variant="primary"
                     size="small"
                     onPress={handleNewChat}
@@ -257,7 +259,7 @@ export const ProjectDetailScreen: React.FC = () => {
       {/* Delete Project Button */}
       <View style={styles.footer}>
         <Button
-          title="Delete Project"
+          title={t('projects.delete')}
           variant="ghost"
           size="medium"
           onPress={handleDeleteProject}

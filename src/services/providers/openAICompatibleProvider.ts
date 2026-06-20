@@ -13,7 +13,7 @@ import type {
   GenerationOptions,
   StreamCallbacks,
 } from './types';
-import { createStreamingRequest, parseOpenAIMessage } from '../httpClient';
+import { createStreamingRequest, parseOpenAIMessage, isPrivateNetworkEndpoint } from '../httpClient';
 import { ThinkTagParser, processDelta, generateOllamaChatImpl } from './openAICompatibleStream';
 import { buildOpenAIMessagesImpl } from './openAIMessageBuilder';
 import logger from '../../utils/logger';
@@ -117,6 +117,14 @@ export class OpenAICompatibleProvider implements LLMProvider {
   ): Promise<void> {
     if (!this.config.modelId) {
       callbacks.onError(new Error('No model selected'));
+      return;
+    }
+
+    if (!isPrivateNetworkEndpoint(this.config.endpoint)) {
+      callbacks.onError(new Error(
+        'Remote server endpoint must be on a private network (LAN). ' +
+        'Public internet endpoints are not permitted for chat data.'
+      ));
       return;
     }
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Linking } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { AppSheet } from './AppSheet';
 import { useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
@@ -16,6 +17,7 @@ interface SharePromptSheetProps {
 export const SharePromptSheet: React.FC<SharePromptSheetProps> = ({ visible, onClose }) => {
   const styles = useThemedStyles(createStyles);
   const setEngaged = useAppStore(s => s.setHasEngagedSharePrompt);
+  const { t } = useTranslation();
 
   const handleEngage = (url: string) => {
     setEngaged(true);
@@ -24,24 +26,22 @@ export const SharePromptSheet: React.FC<SharePromptSheetProps> = ({ visible, onC
   };
 
   return (
-    <AppSheet visible={visible} onClose={onClose} enableDynamicSizing title="Support Open-Source AI">
+    <AppSheet visible={visible} onClose={onClose} enableDynamicSizing title={t('sharePrompt.title')}>
       <View style={styles.content}>
-        <Text style={styles.message}>
-          Off Grid is completely free, open-source, and private — your data never leaves your device. Help grow the movement for accessible, private AI by spreading the word.
-        </Text>
+        <Text style={styles.message}>{t('sharePrompt.message')}</Text>
 
         <TouchableOpacity style={styles.button} onPress={() => handleEngage(GITHUB_URL)}>
           <Icon name="star" size={18} color={styles.buttonText.color} />
-          <Text style={styles.buttonText}>Star on GitHub</Text>
+          <Text style={styles.buttonText}>{t('sharePrompt.starOnGitHub')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.button} onPress={() => handleEngage(SHARE_ON_X_URL)}>
           <Icon name="share-2" size={18} color={styles.buttonText.color} />
-          <Text style={styles.buttonText}>Share on X</Text>
+          <Text style={styles.buttonText}>{t('sharePrompt.shareOnX')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.dismissButton} onPress={onClose}>
-          <Text style={styles.dismissText}>Maybe later</Text>
+          <Text style={styles.dismissText}>{t('sharePrompt.maybeLater')}</Text>
         </TouchableOpacity>
       </View>
     </AppSheet>
