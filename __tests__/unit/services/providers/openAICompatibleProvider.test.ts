@@ -14,6 +14,8 @@ jest.mock('../../../../src/services/httpClient', () => ({
   createNDJSONStreamingRequest: jest.fn(),
   imageToBase64DataUrl: jest.fn(),
   fetchWithTimeout: jest.fn(),
+  // Allow all endpoints in unit tests; enforcement is tested separately.
+  isPrivateNetworkEndpoint: jest.fn(() => true),
   parseOpenAIMessage: jest.fn((event: { data: string }) => {
     if (typeof event.data !== 'string') return null;
     const data = event.data.trim();
@@ -189,6 +191,27 @@ describe('OpenAICompatibleProvider', () => {
 
       expect(onError).toHaveBeenCalledWith(expect.any(Error));
       expect(onError.mock.calls[0][0].message).toBe('No model selected');
+    });
+
+    it('should call onError when endpoint is on public internet', async () => {
+      const { isPrivateNetworkEndpoint } = httpClient as unknown as { isPrivateNetworkEndpoint: jest.Mock };
+      isPrivateNetworkEndpoint.mockReturnValueOnce(false);
+
+      const publicProvider = new OpenAICompatibleProvider('public', {
+        endpoint: 'http://api.example.com',
+        modelId: 'some-model',
+      });
+
+      const onError = jest.fn();
+      await publicProvider.generate(
+        [{ id: '1', role: 'user', content: 'Hi', timestamp: 0 }],
+        {},
+        { onToken: jest.fn(), onComplete: jest.fn(), onError }
+      );
+
+      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onError.mock.calls[0][0].message).toContain('private network');
+      expect(httpClient.createStreamingRequest).not.toHaveBeenCalled();
     });
 
     it('should make streaming request to correct endpoint', async () => {

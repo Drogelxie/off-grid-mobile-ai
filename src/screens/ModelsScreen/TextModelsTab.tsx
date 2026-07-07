@@ -1,5 +1,7 @@
+/* eslint-disable max-lines */
 import React, { useEffect } from 'react';
 import { View, Text, FlatList, TextInput, ActivityIndicator, RefreshControl, TouchableOpacity, InteractionManager, Platform } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import DeviceInfo from 'react-native-device-info';
 import Icon from 'react-native-vector-icons/Feather';
 import { AttachStep, useSpotlightTour } from 'react-native-spotlight-tour';
@@ -70,6 +72,7 @@ const ModelDetailView: React.FC<DetailProps> = ({
   getDownloadedModel, isModelDownloaded, isRepairingVisionModel,
   handleDownload, handleRepairMmProj, handleCancelDownload, handleDeleteModel,
 }) => {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const { setDownloadedModels } = useAppStore();
@@ -166,7 +169,7 @@ const ModelDetailView: React.FC<DetailProps> = ({
             curatedEntry.confirmDownload.title,
             curatedEntry.confirmDownload.message,
             [
-              { text: 'Cancel', style: 'cancel', onPress: () => setAlertState(hideAlert()) },
+              { text: t('common.cancel'), style: 'cancel', onPress: () => setAlertState(hideAlert()) },
               { text: 'Download anyway', style: 'default', onPress: () => { setAlertState(hideAlert()); proceedDownload(); } },
             ],
           ));
@@ -178,7 +181,7 @@ const ModelDetailView: React.FC<DetailProps> = ({
     const liteRTMeta = LITERT_FILE_META[item.name];
     const displayName = liteRTMeta?.displayName ?? item.name.replace('.gguf', '');
     const recommended = liteRTMeta
-      ? { pillLabel: 'Recommended', highlightText: liteRTMeta.highlight }
+      ? { pillLabel: t('models.recommended'), highlightText: liteRTMeta.highlight }
       : undefined;
     const storeEntry = storeDownloads[s.downloadKey];
     const failedState = s.hasFailed && s.errorMessage && storeEntry?.downloadId
@@ -335,9 +338,10 @@ interface ModelListItemProps {
   isDownloaded: boolean; isTrending: boolean; onPress: () => void;
 }
 const ModelListItem: React.FC<ModelListItemProps> = ({ item, index, focusTrigger, isDownloaded, isTrending, onPress }) => {
+  const { t } = useTranslation();
   const { isCompatible, incompatibleReason } = getTextModelCompatibility(item);
   const isLiteRTParent = item.id === LITERT_PARENT_ID;
-  const recommended = isLiteRTParent ? LITERT_PARENT_RECOMMENDED : undefined;
+  const recommended = isLiteRTParent ? { ...LITERT_PARENT_RECOMMENDED, pillLabel: t('models.recommended') } : undefined;
   // Strip files for the LiteRT parent so ModelCard doesn't render the size-range
   // and "N files" badges — the curated chips already convey the relevant info.
   // The original item (with files) still flows through onPress → handleSelectModel.
@@ -396,7 +400,7 @@ export const TextModelsTab: React.FC<Props> = (props) => {
   const { goTo } = useSpotlightTour();
 
   const renderModelItem = ({ item, index }: { item: ModelInfo; index: number }) => (
-    <ModelListItem item={item} index={index} focusTrigger={focusTrigger} isDownloaded={downloadedModels.some(m => m.id.startsWith(item.id))} isTrending={trendingAsModelInfo.some(t => t.id === item.id)} onPress={() => handleSelectModel(item)} />
+    <ModelListItem item={item} index={index} focusTrigger={focusTrigger} isDownloaded={downloadedModels.some(m => m.id.startsWith(item.id))} isTrending={trendingAsModelInfo.some(tm => tm.id === item.id)} onPress={() => handleSelectModel(item)} />
   );
 
   const onBack = () => applyBackNavigation(setSelectedModel, setModelFiles, goTo);

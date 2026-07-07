@@ -14,6 +14,7 @@ import { useTheme, useThemedStyles } from '../theme';
 import { getUserFacingDownloadMessage } from '../utils/downloadErrors';
 import type { ThemeColors, ThemeShadows } from '../theme';
 import { RECOMMENDED_MODELS, TRENDING_FAMILIES, TYPOGRAPHY, SPACING } from '../constants';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../stores';
 import { useDownloadStore, isActiveStatus } from '../stores/downloadStore';
 import { useRemoteServerStore } from '../stores/remoteServerStore';
@@ -71,6 +72,7 @@ export const ModelDownloadScreen: React.FC<Props> = ({ navigation }) => {
   const [showServerModal, setShowServerModal] = useState(false);
   const healthCheckInFlight = useRef(false);
 
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -240,7 +242,7 @@ export const ModelDownloadScreen: React.FC<Props> = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <View testID="model-download-loading" style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Analyzing your device...</Text>
+        <Text style={styles.loadingText}>{t('modelDownload.analyzingDevice')}</Text>
       </View>
     </SafeAreaView>
   );
@@ -250,9 +252,9 @@ export const ModelDownloadScreen: React.FC<Props> = ({ navigation }) => {
       <View testID="model-download-screen" style={styles.container}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.title}>Set Up Your AI</Text>
+            <Text style={styles.title}>{t('modelDownload.title')}</Text>
             <Text style={styles.subtitle}>
-              Connect to a model server on your network, or download one to run directly on your device.
+              {t('modelDownload.subtitle')}
             </Text>
           </View>
 
@@ -269,15 +271,15 @@ export const ModelDownloadScreen: React.FC<Props> = ({ navigation }) => {
             colors={colors}
           />
 
-          <Text style={styles.sectionTitle}>Download to Your Device</Text>
+          <Text style={styles.sectionTitle}>{t('modelDownload.downloadToDevice')}</Text>
 
           <Card style={styles.deviceCard}>
             <View style={styles.deviceInfo}>
-              <Text style={styles.deviceLabel}>Your Device</Text>
+              <Text style={styles.deviceLabel}>{t('modelDownload.yourDevice')}</Text>
               <Text style={styles.deviceValue}>{deviceInfo?.deviceModel}</Text>
             </View>
             <View style={styles.deviceInfo}>
-              <Text style={styles.deviceLabel}>Available Memory</Text>
+              <Text style={styles.deviceLabel}>{t('modelDownload.availableMemory')}</Text>
               <Text style={styles.deviceValue}>{hardwareService.formatBytes(deviceInfo?.availableMemory || 0)}</Text>
             </View>
           </Card>
@@ -307,14 +309,14 @@ export const ModelDownloadScreen: React.FC<Props> = ({ navigation }) => {
 
           {recommendedModels.length === 0 && (
             <Card style={styles.warningCard}>
-              <Text style={styles.warningTitle}>Limited Compatibility</Text>
-              <Text style={styles.warningText}>Your device has limited memory. You can still browse and download smaller models from the model browser.</Text>
+              <Text style={styles.warningTitle}>{t('modelDownload.limitedCompatibility')}</Text>
+              <Text style={styles.warningText}>{t('modelDownload.limitedRAMMessage')}</Text>
             </Card>
           )}
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button title="Skip for Now" variant="ghost" onPress={() => navigation.replace('Main')} testID="model-download-skip" />
+          <Button title={t('modelDownload.skipForNow')} variant="ghost" onPress={() => navigation.replace('Main')} testID="model-download-skip" />
         </View>
 
         <CustomAlert visible={alertState.visible} title={alertState.title} message={alertState.message} buttons={alertState.buttons} onClose={() => setAlertState(hideAlert())} />

@@ -6,14 +6,15 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
-import { SPACING, TYPOGRAPHY } from '../constants';
+import { SPACING, TYPOGRAPHY, GRADIENTS } from '../constants';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'gradient';
   size?: 'small' | 'medium' | 'large';
   /** Highlighted state for toggle buttons */
   active?: boolean;
@@ -41,15 +42,6 @@ export const Button: React.FC<ButtonProps> = ({
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
 
-  const buttonStyles = [
-    styles.button,
-    styles[`button_${variant}`],
-    styles[`button_${size}`],
-    active && styles.button_active,
-    disabled && styles.button_disabled,
-    style,
-  ];
-
   const textStyles = [
     styles.text,
     styles[`text_${variant}`],
@@ -59,25 +51,55 @@ export const Button: React.FC<ButtonProps> = ({
     textStyle,
   ];
 
+  const inner = loading ? (
+    <ActivityIndicator
+      color={variant === 'primary' || variant === 'gradient' ? '#FFFFFF' : colors.primary}
+      size="small"
+    />
+  ) : (
+    <>
+      {icon}
+      <Text style={textStyles}>{title}</Text>
+    </>
+  );
+
+  if (variant === 'gradient') {
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled || loading}
+        activeOpacity={0.85}
+        testID={testID}
+        style={[styles.gradientWrapper, disabled && styles.button_disabled, style]}
+      >
+        <LinearGradient
+          colors={GRADIENTS.primary}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.button, styles[`button_${size}`]]}
+        >
+          {inner}
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
-      style={buttonStyles}
+      style={[
+        styles.button,
+        styles[`button_${variant}`],
+        styles[`button_${size}`],
+        active && styles.button_active,
+        disabled && styles.button_disabled,
+        style,
+      ]}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.7}
       testID={testID}
     >
-      {loading ? (
-        <ActivityIndicator
-          color={variant === 'primary' ? colors.text : colors.primary}
-          size="small"
-        />
-      ) : (
-        <>
-          {icon}
-          <Text style={textStyles}>{title}</Text>
-        </>
-      )}
+      {inner}
     </TouchableOpacity>
   );
 };
@@ -87,23 +109,25 @@ const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    borderRadius: 8,
+    borderRadius: 12,
     gap: SPACING.sm,
   },
+  gradientWrapper: {
+    borderRadius: 12,
+    overflow: 'hidden' as const,
+  },
   button_primary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.primary,
+    backgroundColor: colors.primary,
   },
   button_secondary: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.secondary,
   },
   button_outline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.border,
   },
   button_ghost: {
     backgroundColor: 'transparent',
@@ -112,6 +136,9 @@ const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: colors.error,
+  },
+  button_gradient: {
+    backgroundColor: 'transparent',
   },
   button_active: {
     borderColor: colors.primary,
@@ -133,13 +160,13 @@ const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
   },
   text: {
     ...TYPOGRAPHY.body,
-    fontWeight: '400' as const,
+    fontWeight: '500' as const,
   },
   text_primary: {
-    color: colors.primary,
+    color: '#FFFFFF',
   },
   text_secondary: {
-    color: colors.text,
+    color: colors.secondary,
   },
   text_outline: {
     color: colors.textSecondary,
@@ -149,6 +176,9 @@ const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
   },
   text_danger: {
     color: colors.error,
+  },
+  text_gradient: {
+    color: '#FFFFFF',
   },
   text_active: {
     color: colors.primary,

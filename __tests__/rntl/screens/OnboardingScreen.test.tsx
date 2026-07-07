@@ -114,16 +114,16 @@ describe('OnboardingScreen', () => {
 
   it('renders first slide content', () => {
     const { getByText } = render(<OnboardingScreen navigation={navigation} />);
-    expect(getByText('Welcome')).toBeTruthy();
-    expect(getByText('Off Grid')).toBeTruthy();
-    expect(getByText('Your AI companion')).toBeTruthy();
+    expect(getByText('YOURS')).toBeTruthy();
+    expect(getByText(/No strings attached/)).toBeTruthy();
+    expect(getByText(/No subscriptions/)).toBeTruthy();
   });
 
   it('renders second slide content', () => {
     const { getByText } = render(<OnboardingScreen navigation={navigation} />);
-    expect(getByText('Private')).toBeTruthy();
-    expect(getByText('On-Device')).toBeTruthy();
-    expect(getByText('Everything stays local')).toBeTruthy();
+    expect(getByText('MAGIC')).toBeTruthy();
+    expect(getByText(/It figures it out/)).toBeTruthy();
+    expect(getByText(/Describe a picture/)).toBeTruthy();
   });
 
   it('shows navigation dots', () => {

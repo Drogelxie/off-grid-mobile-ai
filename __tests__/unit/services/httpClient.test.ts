@@ -275,6 +275,17 @@ describe('httpClient', () => {
       expect(isPrivateNetworkEndpoint('http://myserver.local:11434')).toBe(true);
     });
 
+    it('should detect Tailscale CGNAT 100.64-127.x.x as private', () => {
+      expect(isPrivateNetworkEndpoint('http://100.64.0.1:11434')).toBe(true);
+      expect(isPrivateNetworkEndpoint('http://100.100.1.1:1234')).toBe(true);
+      expect(isPrivateNetworkEndpoint('http://100.127.255.255:8080')).toBe(true);
+    });
+
+    it('should NOT detect 100.63.x.x or 100.128.x.x as private', () => {
+      expect(isPrivateNetworkEndpoint('http://100.63.0.1:11434')).toBe(false);
+      expect(isPrivateNetworkEndpoint('http://100.128.0.1:11434')).toBe(false);
+    });
+
     it('should detect public internet as NOT private', () => {
       expect(isPrivateNetworkEndpoint('http://api.openai.com:443')).toBe(false);
       expect(isPrivateNetworkEndpoint('http://8.8.8.8:80')).toBe(false);

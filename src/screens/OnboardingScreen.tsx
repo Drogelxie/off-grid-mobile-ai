@@ -18,6 +18,7 @@ import ReanimatedAnimated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../components';
 import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
@@ -130,6 +131,7 @@ const SlideContent: React.FC<{
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   navigation,
 }) => {
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -184,9 +186,32 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
     navigation.replace('ModelDownload');
   };
 
-  const renderSlide = ({ item, index }: { item: typeof ONBOARDING_SLIDES[0]; index: number }) => (
-    <SlideContent item={item} isActive={currentIndex === index} styles={styles} accentColor={colors.primary} />
-  );
+  const slideAccentColors = [
+    colors.primary,
+    colors.secondary,
+    colors.accent,
+    colors.info,
+  ];
+
+  const slideKeys = ['slide1', 'slide2', 'slide3', 'slide4'] as const;
+
+  const renderSlide = ({ item, index }: { item: typeof ONBOARDING_SLIDES[0]; index: number }) => {
+    const slideKey = slideKeys[index] ?? slideKeys[0];
+    const translatedItem = {
+      ...item,
+      keyword: t(`onboarding.${slideKey}.keyword`),
+      title: t(`onboarding.${slideKey}.title`),
+      description: t(`onboarding.${slideKey}.description`),
+    };
+    return (
+      <SlideContent
+        item={translatedItem}
+        isActive={currentIndex === index}
+        styles={styles}
+        accentColor={slideAccentColors[index % slideAccentColors.length]}
+      />
+    );
+  };
 
   const renderDots = () => (
     <View testID="onboarding-dots" style={styles.dotsContainer}>
@@ -227,7 +252,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         <View style={styles.header}>
           {!isLastSlide && (
             <Button
-              title="Skip"
+              title={t('onboarding.skip')}
               variant="ghost"
               onPress={handleSkip}
               testID="onboarding-skip"
@@ -257,7 +282,8 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
 
         <View style={styles.footer}>
           <Button
-            title={isLastSlide ? 'Get Started' : 'Next'}
+            title={isLastSlide ? t('onboarding.getStarted') : t('onboarding.next')}
+            variant="gradient"
             onPress={handleNext}
             size="large"
             style={styles.nextButton}
@@ -293,14 +319,15 @@ const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
   slideInner: { paddingHorizontal: SPACING.xxl + 8, alignItems: 'flex-start' as const, width: '100%' as const },
   keyword: {
     fontFamily: FONTS.mono,
-    fontSize: 48,
-    fontWeight: '200' as const,
-    letterSpacing: 6,
+    fontSize: 52,
+    fontWeight: '600' as const,
+    letterSpacing: 4,
     marginBottom: SPACING.lg,
   },
   accentLine: {
-    height: 2,
-    width: 48,
+    height: 3,
+    width: 56,
+    borderRadius: 2,
     marginBottom: SPACING.xl,
   },
   title: {
@@ -308,12 +335,13 @@ const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     color: colors.text,
     textAlign: 'left' as const,
     marginBottom: SPACING.md,
+    lineHeight: 38,
   },
   description: {
     ...TYPOGRAPHY.body,
     color: colors.textSecondary,
     textAlign: 'left' as const,
-    lineHeight: 22,
+    lineHeight: 24,
   },
   dotsContainer: {
     flexDirection: 'row' as const,
@@ -326,7 +354,7 @@ const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.primary,
-    marginRight: SPACING.xs,
+    marginRight: 6,
   },
   footer: {
     paddingHorizontal: SPACING.xl,

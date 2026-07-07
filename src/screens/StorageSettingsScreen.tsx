@@ -8,6 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../components';
 import { CustomAlert, showAlert, hideAlert, AlertState, initialAlertState } from '../components/CustomAlert';
 import { useTheme, useThemedStyles } from '../theme';
@@ -20,6 +21,7 @@ import { createStyles } from './StorageSettingsScreen.styles';
 
 export const StorageSettingsScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [storageUsed, setStorageUsed] = useState(0);
@@ -63,12 +65,12 @@ export const StorageSettingsScreen: React.FC = () => {
   const handleClearAllStaleDownloads = useCallback(() => {
     setAlertState(
       showAlert(
-        'Clear Stale Downloads',
-        `Clear ${staleDownloads.length} stale download entry(s)?`,
+        t('storage.clearStaleTitle'),
+        t('storage.clearStaleConfirm', { count: staleDownloads.length }),
         [
           { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Clear All',
+            text: t('storage.clearAllStale'),
             style: 'destructive',
             onPress: () => {
               setAlertState(hideAlert());
@@ -94,54 +96,54 @@ export const StorageSettingsScreen: React.FC = () => {
         >
           <Icon name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Storage</Text>
+        <Text style={styles.title}>{t('storage.title')}</Text>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Storage Usage</Text>
+          <Text style={styles.sectionTitle}>{t('storage.storageUsage')}</Text>
           <View style={styles.storageBar}>
             <View style={[styles.storageUsed, { width: `${Math.min(usedPercentage, 100)}%` }]} />
           </View>
           <View style={styles.storageLegend}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-              <Text style={styles.legendText}>Used: {hardwareService.formatBytes(storageUsed)}</Text>
+              <Text style={styles.legendText}>{t('storage.used', { bytes: hardwareService.formatBytes(storageUsed) })}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: colors.surfaceLight }]} />
-              <Text style={styles.legendText}>Free: {hardwareService.formatBytes(availableStorage)}</Text>
+              <Text style={styles.legendText}>{t('storage.free', { bytes: hardwareService.formatBytes(availableStorage) })}</Text>
             </View>
           </View>
         </Card>
 
         <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Breakdown</Text>
+          <Text style={styles.sectionTitle}>{t('storage.breakdown')}</Text>
           <View style={styles.infoRow}>
             <View style={styles.infoRowLeft}>
               <Icon name="cpu" size={18} color={colors.primary} />
-              <Text style={styles.infoLabel}>LLM Models</Text>
+              <Text style={styles.infoLabel}>{t('storage.llmModels')}</Text>
             </View>
             <Text style={styles.infoValue}>{downloadedModels.length}</Text>
           </View>
           <View style={styles.infoRow}>
             <View style={styles.infoRowLeft}>
               <Icon name="image" size={18} color={colors.primary} />
-              <Text style={styles.infoLabel}>Image Models</Text>
+              <Text style={styles.infoLabel}>{t('storage.imageModels')}</Text>
             </View>
             <Text style={styles.infoValue}>{downloadedImageModels.length}</Text>
           </View>
           <View style={styles.infoRow}>
             <View style={styles.infoRowLeft}>
               <Icon name="hard-drive" size={18} color={colors.primary} />
-              <Text style={styles.infoLabel}>Model Storage</Text>
+              <Text style={styles.infoLabel}>{t('storage.modelStorage')}</Text>
             </View>
             <Text style={styles.infoValue}>{hardwareService.formatBytes(storageUsed)}</Text>
           </View>
           <View style={[styles.infoRow, styles.lastRow]}>
             <View style={styles.infoRowLeft}>
               <Icon name="message-circle" size={18} color={colors.primary} />
-              <Text style={styles.infoLabel}>Conversations</Text>
+              <Text style={styles.infoLabel}>{t('storage.conversations')}</Text>
             </View>
             <Text style={styles.infoValue}>{conversations.length}</Text>
           </View>
@@ -149,7 +151,7 @@ export const StorageSettingsScreen: React.FC = () => {
 
         {downloadedModels.length > 0 && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>LLM Models</Text>
+            <Text style={styles.sectionTitle}>{t('storage.llmModels')}</Text>
             {downloadedModels.map((model, index) => (
               <View
                 key={model.id}
@@ -167,7 +169,7 @@ export const StorageSettingsScreen: React.FC = () => {
 
         {downloadedImageModels.length > 0 && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Image Models</Text>
+            <Text style={styles.sectionTitle}>{t('storage.imageModels')}</Text>
             {downloadedImageModels.map((model, index) => (
               <View
                 key={model.id}
@@ -193,16 +195,16 @@ export const StorageSettingsScreen: React.FC = () => {
         {staleDownloads.length > 0 && (
           <Card style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Stale Downloads</Text>
+              <Text style={styles.sectionTitle}>{t('storage.staleDownloads')}</Text>
               <TouchableOpacity
                 style={styles.clearAllButton}
                 onPress={handleClearAllStaleDownloads}
               >
-                <Text style={styles.clearAllText}>Clear All</Text>
+                <Text style={styles.clearAllText}>{t('storage.clearAllStale')}</Text>
               </TouchableOpacity>
             </View>
             <Text style={[styles.hint, { textAlign: 'left' as const, marginBottom: SPACING.md }]}>
-              These download entries have invalid or missing data and can be safely cleared.
+              {t('storage.invalidData')}
             </Text>
             {staleDownloads.map(entry => (
               <View key={entry.modelKey} style={styles.orphanedRow}>
@@ -226,7 +228,7 @@ export const StorageSettingsScreen: React.FC = () => {
         <OrphanedFilesSection onStorageChange={loadStorageInfo} />
 
         <Text style={styles.hint}>
-          To free up space, you can delete models from the Models tab.
+          {t('storage.toFreeUpSpace')}
         </Text>
       </ScrollView>
 

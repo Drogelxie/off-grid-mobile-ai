@@ -1,4 +1,4 @@
-// Light and dark color palettes + shadow definitions
+// Color palettes, shadow definitions, and gradient tokens for the Aurora design system.
 
 export type ThemeColors = typeof COLORS_LIGHT;
 
@@ -11,113 +11,169 @@ export type ThemeShadows = {
   medium: ShadowStyle;
   large: ShadowStyle;
   glow: ShadowStyle;
+  glowSecondary: ShadowStyle;
+  glowAccent: ShadowStyle;
 };
 
-// ── Light palette ──────────────────────────────────────────────────
+// ── Gradient tokens ──────────────────────────────────────────────────────────
+export const GRADIENTS = {
+  // Primary violet-to-indigo — buttons, active states
+  primary: ['#7C3AED', '#4F46E5'] as [string, string],
+  // Aurora — hero backgrounds, onboarding
+  aurora: ['#7C3AED', '#0EA5E9', '#10B981'] as [string, string, string],
+  // Warm — alerts, trending badges
+  warm: ['#F59E0B', '#EF4444'] as [string, string],
+  // Nature — emerald accent areas
+  nature: ['#10B981', '#0D9488'] as [string, string],
+  // Dark card fill — subtle depth on dark surfaces
+  darkCard: ['#1A1A2E', '#252547'] as [string, string],
+  // Hero overlay — home screen header gradient
+  hero: ['#0D0D1A', '#1A1A2E'] as [string, string],
+  // User message bubble
+  userBubble: ['#7C3AED', '#4F46E5'] as [string, string],
+  // Info / cyan accent
+  info: ['#0EA5E9', '#06B6D4'] as [string, string],
+};
+
+// ── Light palette ──────────────────────────────────────────────────────────
 export const COLORS_LIGHT = {
-  // Primary accent
-  primary: '#059669',
-  primaryDark: '#047857',
-  primaryLight: '#34D399',
+  // Primary accent: violet
+  primary: '#7C3AED',
+  primaryDark: '#6D28D9',
+  primaryLight: '#A78BFA',
+
+  // Secondary accent: emerald (off-grid / nature)
+  secondary: '#10B981',
+  secondaryDark: '#059669',
+  secondaryLight: '#34D399',
+
+  // Tertiary accent: amber (energy / warmth)
+  accent: '#F59E0B',
+  accentLight: '#FCD34D',
+
+  // Info accent: cyan (data / AI)
+  info: '#0EA5E9',
+  infoLight: '#38BDF8',
 
   // Backgrounds
-  background: '#FFFFFF',
-  surface: '#F5F5F5',
-  surfaceLight: '#EBEBEB',
-  surfaceHover: '#E0E0E0',
+  background: '#FAFBFF',
+  surface: '#F1F5FF',
+  surfaceLight: '#E8EEFF',
+  surfaceHover: '#DDE5FF',
 
   // Text hierarchy
-  text: '#0A0A0A',
-  textSecondary: '#525252',
-  textMuted: '#8A8A8A',
-  textDisabled: '#BFBFBF',
+  text: '#0F0A1E',
+  textSecondary: '#4B5480',
+  textMuted: '#8892B0',
+  textDisabled: '#C0C8E0',
 
   // Borders
-  border: '#E5E5E5',
-  borderLight: '#D4D4D4',
-  borderFocus: '#059669',
+  border: '#DDE5FF',
+  borderLight: '#EBF0FF',
+  borderFocus: '#7C3AED',
 
   // Semantic colors
-  success: '#525252',
-  warning: '#0A0A0A',
-  error: '#DC2626',
-  trending: '#D97706',
-  errorBackground: 'rgba(220, 38, 38, 0.10)',
-  info: '#525252',
-
-  // Special
-  overlay: 'rgba(0, 0, 0, 0.4)',
-  divider: '#EBEBEB',
-};
-
-// ── Dark palette ───────────────────────────────────────────────────
-export const COLORS_DARK = {
-  // Primary accent
-  primary: '#34D399',
-  primaryDark: '#10B981',
-  primaryLight: '#6EE7B7',
-
-  // Backgrounds
-  background: '#0A0A0A',
-  surface: '#141414',
-  surfaceLight: '#1E1E1E',
-  surfaceHover: '#252525',
-
-  // Text hierarchy
-  text: '#FFFFFF',
-  textSecondary: '#B0B0B0',
-  textMuted: '#808080',
-  textDisabled: '#4A4A4A',
-
-  // Borders
-  border: '#1E1E1E',
-  borderLight: '#2A2A2A',
-  borderFocus: '#34D399',
-
-  // Semantic colors
-  success: '#B0B0B0',
-  warning: '#FFFFFF',
-  error: '#C75050',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
   trending: '#F59E0B',
-  errorBackground: 'rgba(239, 68, 68, 0.15)',
-  info: '#B0B0B0',
+  errorBackground: 'rgba(239, 68, 68, 0.10)',
 
   // Special
-  overlay: 'rgba(0, 0, 0, 0.7)',
-  divider: '#1A1A1A',
+  overlay: 'rgba(15, 10, 30, 0.45)',
+  divider: '#E8EEFF',
 };
 
-// ── Light shadows ────────────────────────────────────────────────────
-// Uses CSS boxShadow (RN 0.76+ with New Architecture) for cross-platform
-// shadow rendering. Works identically on iOS and Android.
+// ── Dark palette ───────────────────────────────────────────────────────────
+export const COLORS_DARK = {
+  // Primary accent: violet
+  primary: '#A78BFA',
+  primaryDark: '#7C3AED',
+  primaryLight: '#C4B5FD',
+
+  // Secondary accent: emerald
+  secondary: '#34D399',
+  secondaryDark: '#10B981',
+  secondaryLight: '#6EE7B7',
+
+  // Tertiary accent: amber
+  accent: '#FBBF24',
+  accentLight: '#FCD34D',
+
+  // Info accent: cyan
+  info: '#38BDF8',
+  infoLight: '#7DD3FC',
+
+  // Backgrounds: deep navy, not pure black
+  background: '#0D0D1A',
+  surface: '#1A1A2E',
+  surfaceLight: '#252547',
+  surfaceHover: '#2D2D5A',
+
+  // Text hierarchy
+  text: '#F1F5FF',
+  textSecondary: '#C0C8E0',
+  textMuted: '#6B7494',
+  textDisabled: '#3A3F5C',
+
+  // Borders
+  border: '#252547',
+  borderLight: '#2D2D5A',
+  borderFocus: '#A78BFA',
+
+  // Semantic colors
+  success: '#34D399',
+  warning: '#FBBF24',
+  error: '#F87171',
+  trending: '#FBBF24',
+  errorBackground: 'rgba(248, 113, 113, 0.15)',
+
+  // Special
+  overlay: 'rgba(0, 0, 0, 0.72)',
+  divider: '#252547',
+};
+
+// ── Light shadows ────────────────────────────────────────────────────────────
 export const SHADOWS_LIGHT: ThemeShadows = {
   small: {
-    boxShadow: '0px 1px 8px 0px rgba(0,0,0,0.18)',
+    boxShadow: '0px 2px 10px 0px rgba(124,58,237,0.10)',
   },
   medium: {
-    boxShadow: '0px 2px 10px 0px rgba(0,0,0,0.22)',
+    boxShadow: '0px 4px 18px 0px rgba(124,58,237,0.15)',
   },
   large: {
-    boxShadow: '0px 4px 18px 0px rgba(0,0,0,0.35)',
+    boxShadow: '0px 8px 32px 0px rgba(124,58,237,0.22)',
   },
   glow: {
-    boxShadow: '0px 0px 12px 0px rgba(5,150,105,0.25)',
+    boxShadow: '0px 0px 20px 0px rgba(124,58,237,0.30)',
+  },
+  glowSecondary: {
+    boxShadow: '0px 0px 20px 0px rgba(16,185,129,0.30)',
+  },
+  glowAccent: {
+    boxShadow: '0px 0px 20px 0px rgba(245,158,11,0.30)',
   },
 };
 
-// ── Dark shadows (crisp white glow for depth) ───────────────────────
+// ── Dark shadows (colored glows for depth) ───────────────────────────────────
 export const SHADOWS_DARK: ThemeShadows = {
   small: {
-    boxShadow: '0px 0px 6px 0px rgba(255,255,255,0.18)',
+    boxShadow: '0px 2px 10px 0px rgba(167,139,250,0.12)',
   },
   medium: {
-    boxShadow: '0px 0px 6px 0px rgba(255,255,255,0.20)',
+    boxShadow: '0px 4px 18px 0px rgba(167,139,250,0.18)',
   },
   large: {
-    boxShadow: '0px 0px 10px 0px rgba(255,255,255,0.25)',
+    boxShadow: '0px 8px 32px 0px rgba(167,139,250,0.25)',
   },
   glow: {
-    boxShadow: '0px 0px 8px 0px rgba(52,211,153,0.30)',
+    boxShadow: '0px 0px 24px 0px rgba(167,139,250,0.40)',
+  },
+  glowSecondary: {
+    boxShadow: '0px 0px 24px 0px rgba(52,211,153,0.35)',
+  },
+  glowAccent: {
+    boxShadow: '0px 0px 24px 0px rgba(251,191,36,0.35)',
   },
 };
 
@@ -143,9 +199,9 @@ export function createElevation(colors: ThemeColors) {
       backgroundColor: `${colors.surface}F2`,
       borderTopWidth: 1,
       borderColor: colors.borderLight,
-      borderRadius: 16,
+      borderRadius: 20,
       blur: {
-        ios: { blurAmount: 10, blurType: colors.background === '#0A0A0A' ? 'dark' : 'light' },
+        ios: { blurAmount: 10, blurType: colors.background === '#0D0D1A' ? 'dark' : 'light' },
         android: { overlayColor: colors.overlay },
       },
     },
@@ -153,9 +209,9 @@ export function createElevation(colors: ThemeColors) {
       backgroundColor: `${colors.surface}FA`,
       borderTopWidth: 1,
       borderColor: colors.primary,
-      borderRadius: 16,
+      borderRadius: 20,
       blur: {
-        ios: { blurAmount: 15, blurType: colors.background === '#0A0A0A' ? 'dark' : 'light' },
+        ios: { blurAmount: 15, blurType: colors.background === '#0D0D1A' ? 'dark' : 'light' },
         android: { overlayColor: colors.overlay },
       },
     },

@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { Card, Button } from '../components';
 import { CustomAlert, showAlert, hideAlert, AlertState, initialAlertState } from '../components/CustomAlert';
 import { useTheme, useThemedStyles } from '../theme';
@@ -19,6 +20,7 @@ import { WHISPER_MODELS } from '../services';
 
 export const VoiceSettingsScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [alertState, setAlertState] = useState<AlertState>(initialAlertState);
@@ -41,13 +43,13 @@ export const VoiceSettingsScreen: React.FC = () => {
         >
           <Icon name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Voice Transcription</Text>
+        <Text style={styles.title}>{t('voice.title')}</Text>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <Card style={styles.section}>
           <Text style={styles.description}>
-            Download a Whisper model to enable on-device voice input. All transcription happens locally - no data is sent to any server.
+            {t('voice.description')}
           </Text>
 
           {(() => {
@@ -58,16 +60,16 @@ export const VoiceSettingsScreen: React.FC = () => {
                     <Text style={styles.modelName}>
                       {WHISPER_MODELS.find(m => m.id === whisperModelId)?.name || whisperModelId}
                     </Text>
-                    <Text style={styles.modelStatus}>Downloaded</Text>
+                    <Text style={styles.modelStatus}>{t('voice.downloaded')}</Text>
                   </View>
                   <Button
-                    title="Remove Model"
+                    title={t('voice.removeModel')}
                     variant="outline"
                     size="small"
                     onPress={() => {
                       setAlertState(showAlert(
-                        'Remove Whisper Model',
-                        'This will disable voice input until you download a model again.',
+                        t('voice.removeModelAlertTitle'),
+                        t('voice.removeConfirm'),
                         [
                           { text: 'Cancel', style: 'cancel' },
                           {
@@ -91,7 +93,7 @@ export const VoiceSettingsScreen: React.FC = () => {
                 <View style={styles.downloading}>
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={styles.downloadingText}>
-                    Downloading... {Math.round(whisperProgress * 100)}%
+                    {t('voice.downloading', { percent: Math.round(whisperProgress * 100) })}
                   </Text>
                   <View style={styles.progressBar}>
                     <View
@@ -103,7 +105,7 @@ export const VoiceSettingsScreen: React.FC = () => {
             }
             return (
               <View style={styles.modelList}>
-                <Text style={styles.selectLabel}>Select a model to download:</Text>
+                <Text style={styles.selectLabel}>{t('voice.selectLabel')}</Text>
                 {WHISPER_MODELS.slice(0, 3).map((model) => (
                   <TouchableOpacity
                     key={model.id}
@@ -132,9 +134,9 @@ export const VoiceSettingsScreen: React.FC = () => {
           <View style={styles.privacyIconContainer}>
             <Icon name="mic" size={18} color={colors.textSecondary} />
           </View>
-          <Text style={styles.privacyTitle}>Privacy First</Text>
+          <Text style={styles.privacyTitle}>{t('voice.privacyTitle')}</Text>
           <Text style={styles.privacyText}>
-            Voice transcription happens entirely on your device. Your audio is never sent to any server or stored anywhere.
+            {t('voice.privacyDescription')}
           </Text>
         </Card>
       </ScrollView>

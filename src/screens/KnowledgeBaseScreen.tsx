@@ -16,6 +16,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { pick, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import { resolvePickedFileUri } from '../utils/resolvePickedFileUri';
 import logger from '../utils/logger';
+import { useTranslation } from 'react-i18next';
 import { useTheme, useThemedStyles } from '../theme';
 import { createStyles } from './KnowledgeBaseScreen.styles';
 import { useProjectStore } from '../stores';
@@ -37,6 +38,7 @@ export const KnowledgeBaseScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { projectId } = route.params;
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -131,8 +133,8 @@ export const KnowledgeBaseScreen: React.FC = () => {
 
   const handleDeleteDocument = (doc: RagDocument) => {
     Alert.alert(
-      'Remove Document',
-      `Remove "${doc.name}" from the knowledge base?`,
+      t('knowledgeBase.removeDocument'),
+      t('knowledgeBase.removeConfirm', { name: doc.name }),
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -195,7 +197,7 @@ export const KnowledgeBaseScreen: React.FC = () => {
       {indexingFile && (
         <View style={styles.indexingBanner}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.indexingText}>Indexing {indexingFile}...</Text>
+          <Text style={styles.indexingText}>{t('knowledgeBase.indexing', { filename: indexingFile })}</Text>
         </View>
       )}
 
@@ -206,10 +208,10 @@ export const KnowledgeBaseScreen: React.FC = () => {
       ) : kbDocs.length === 0 ? (
         <View style={styles.centered}>
           <Icon name="file-text" size={40} color={colors.textMuted} />
-          <Text style={styles.emptyText}>No documents yet</Text>
-          <Text style={styles.emptySubtext}>Add files to build your knowledge base</Text>
+          <Text style={styles.emptyText}>{t('knowledgeBase.noDocuments')}</Text>
+          <Text style={styles.emptySubtext}>{t('knowledgeBase.addFiles')}</Text>
           <TouchableOpacity style={styles.addFirstButton} onPress={handleAddDocument} disabled={isPicking}>
-            <Text style={styles.addFirstButtonText}>Add Document</Text>
+            <Text style={styles.addFirstButtonText}>{t('knowledgeBase.addDocument')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
