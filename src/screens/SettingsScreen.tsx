@@ -23,7 +23,6 @@ import { AnimatedListItem } from '../components/AnimatedListItem';
 import { MadeWithLove } from '../components/MadeWithLove';
 import { DebugLogsScreen } from '../components/DebugLogsScreen';
 import { useSettingsSections } from '../components/settings/sectionRegistry';
-import { ProUpsellBanner } from '../components/settings/ProUpsellBanner';
 import { useFocusTrigger } from '../hooks/useFocusTrigger';
 import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
@@ -35,7 +34,6 @@ import { hardwareService } from '../services';
 import { RootStackParamList, MainTabParamList } from '../navigation/types';
 import { GITHUB_URL, FOLLOW_X_URL, SLACK_INVITE_URL, shareOnX } from '../utils/sharePrompt';
 import { clearProForTesting } from '../services/proLicenseService';
-import { useProStatusLabel } from '../hooks/useProStatusLabel';
 import { SUPPORTED_LANGUAGES } from '../i18n';
 import packageJson from '../../package.json';
 
@@ -72,7 +70,6 @@ export const SettingsScreen: React.FC = () => {
   const devProDisabled = useAppStore((s) => s.devProDisabled);
   const setDevProDisabled = useAppStore((s) => s.setDevProDisabled);
   const setHasRegisteredPro = useAppStore((s) => s.setHasRegisteredPro);
-  const { proStatusLabel } = useProStatusLabel();
 
   useEffect(() => {
     completeChecklistStep('exploredSettings');
@@ -161,7 +158,6 @@ export const SettingsScreen: React.FC = () => {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
 
         {/* PRO Banner */}
-        <ProUpsellBanner trigger={focusTrigger} onGetPro={() => navigation.navigate('ProDetail')} />
 
         {/* Language Selector */}
         <AnimatedEntry index={0} staggerMs={40} trigger={focusTrigger}>
@@ -265,28 +261,6 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </AttachStep>
 
-        {/* PRO Button */}
-        <AnimatedEntry index={6} staggerMs={40} trigger={focusTrigger}>
-          <TouchableOpacity
-            style={styles.proNavButton}
-            onPress={() => navigation.navigate('ProDetail')}
-            activeOpacity={0.75}
-          >
-            <View style={styles.proIconContainer}>
-              <IconMC name="crown" size={18} color={colors.primary} />
-            </View>
-            <View style={styles.proCardText}>
-              <View style={styles.proTitleRow}>
-                <Text style={styles.proNavTitle}>Off Grid AI PRO</Text>
-                <View style={styles.proBadge}>
-                  <Text style={styles.proBadgeText}>PRO</Text>
-                </View>
-              </View>
-              <Text style={styles.proDesc}>{proStatusLabel}</Text>
-            </View>
-            <Icon name="chevron-right" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
-        </AnimatedEntry>
 
         {/* Stay in the loop */}
         <AnimatedEntry index={7} staggerMs={40} trigger={focusTrigger}>

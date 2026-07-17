@@ -15,7 +15,7 @@ i18n.use(initReactI18next).init({
     en: { translation: en },
     de: { translation: de },
   },
-  lng: 'en',
+  lng: (() => { try { return (new Intl.DateTimeFormat().resolvedOptions().locale ?? 'en').toLowerCase().startsWith('de') ? 'de' : 'en'; } catch { return 'en'; } })(),
   fallbackLng: 'en',
   interpolation: {
     escapeValue: false,

@@ -50,6 +50,13 @@ export const de = {
     local: 'Lokal',
   },
 
+  modelSetup: {
+    networkModels: 'Netzwerk-Modelle',
+    scanning: 'Netzwerk wird durchsucht…',
+    noServers: 'Keine Server gefunden. Stelle sicher, dass du im selben WLAN bist wie dein Off Grid AI Desktop-, Ollama- oder LM-Studio-Server, dann erneut suchen oder manuell hinzufügen.',
+    scanNetwork: 'Netzwerk durchsuchen',
+    addServer: 'Server hinzufügen',
+  },
   onboarding: {
     skip: 'Überspringen',
     next: 'Weiter',

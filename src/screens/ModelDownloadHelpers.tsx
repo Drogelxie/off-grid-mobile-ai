@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import {
   View,
@@ -96,18 +97,19 @@ export const NetworkSection: React.FC<{
   onAddManually: () => void;
   colors: ThemeColors;
 }> = ({ servers, discoveredModels, connectingServerId, connectedServerId, isCheckingNetwork, isScanning, onConnectServer, onScanNetwork, onAddManually, colors }) => {
+  const { t } = useTranslation();
   const styles = networkSectionStyles(colors);
   const hasServers = servers.length > 0;
   const busy = isCheckingNetwork || isScanning;
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Network Models</Text>
+      <Text style={styles.sectionTitle}>{t('modelSetup.networkModels')}</Text>
 
       {isCheckingNetwork && !hasServers && (
         <View style={styles.scanningRow}>
           <ActivityIndicator size="small" color={colors.textSecondary} />
-          <Text style={styles.scanningText}>Scanning your network...</Text>
+          <Text style={styles.scanningText}>{t('modelSetup.scanning')}</Text>
         </View>
       )}
 
@@ -126,7 +128,7 @@ export const NetworkSection: React.FC<{
       {!isCheckingNetwork && !hasServers && (
         <>
           <Text style={styles.emptyText}>
-            No servers found. Make sure you're on the same WiFi network as your Off Grid AI Desktop, Ollama, or LM Studio server, then scan or add it manually.
+{t('modelSetup.noServers')}
           </Text>
           <TouchableOpacity
             onPress={() => Linking.openURL(withUtm(OFF_GRID_DESKTOP_URL, 'model-download')).catch(() => {})}
@@ -145,13 +147,13 @@ export const NetworkSection: React.FC<{
         >
           {busy
             ? <ActivityIndicator size="small" color={colors.primary} />
-            : <Text style={[styles.actionButtonText, { color: colors.primary }]}>Scan Network</Text>}
+            : <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t('modelSetup.scanNetwork')}</Text>}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, { borderColor: colors.primary }]}
           onPress={onAddManually}
         >
-          <Text style={[styles.actionButtonText, { color: colors.primary }]}>Add Server</Text>
+          <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t('modelSetup.addServer')}</Text>
         </TouchableOpacity>
       </View>
     </View>

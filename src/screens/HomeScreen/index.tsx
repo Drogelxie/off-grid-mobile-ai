@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, CustomAlert, hideAlert } from '../../components';
@@ -11,7 +11,6 @@ import { useOnboardingSheet } from '../../components/onboarding/useOnboardingShe
 import { useFocusTrigger } from '../../hooks/useFocusTrigger';
 import { AttachStep } from 'react-native-spotlight-tour';
 import Icon from 'react-native-vector-icons/Feather';
-import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useThemedStyles, useTheme } from '../../theme';
 import { createStyles } from './styles';
 import { useHomeScreen, HomeScreenNavigationProp } from './hooks/useHomeScreen';
@@ -149,9 +148,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </Text>
               {showIcon && <PulsatingIcon onPress={openSheet} />}
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('ProDetail')} hitSlop={8} style={styles.crownButton}>
-              <IconMC name="crown" size={16} color={colors.accent} />
-            </TouchableOpacity>
           </View>
 
           {/* Collapsed Models summary — tap to open the manager sheet. Both the

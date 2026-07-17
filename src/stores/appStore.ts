@@ -199,6 +199,15 @@ const DEFAULT_CHECKLIST: OnboardingChecklist = {
   triedImageGen: false, exploredSettings: false, createdProject: false,
 };
 
+function detectDeviceLanguage(): LanguageCode {
+  try {
+    const locale = new Intl.DateTimeFormat().resolvedOptions().locale ?? 'en';
+    return locale.toLowerCase().startsWith('de') ? 'de' : 'en';
+  } catch {
+    return 'en';
+  }
+}
+
 const DEFAULT_SETTINGS: AppSettings = {
   systemPrompt: 'You are a helpful AI assistant running locally on the user\'s device. Be concise and helpful.',
   temperature: 0.7,
@@ -307,7 +316,9 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       themeMode: 'system' as ThemeMode,
       setThemeMode: (mode) => set({ themeMode: mode }),
-      language: 'en' as LanguageCode,
+      // Erstsprache folgt dem Gerät (deutsches System -> deutsches Onboarding);
+      // die Auswahl im Sprachumschalter überschreibt das und wird persistiert.
+      language: detectDeviceLanguage(),
       setLanguage: (code) => set({ language: code }),
       hasCompletedOnboarding: false,
       setOnboardingComplete: (complete) =>
