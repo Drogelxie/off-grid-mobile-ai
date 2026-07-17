@@ -162,6 +162,8 @@ export const en = {
     title: 'Settings',
     language: 'Language',
     languageDesc: 'Change app language',
+    swipeGestures: 'Swipe gestures',
+    swipeGesturesDesc: 'Swipe list items left to delete. Turn off if you trigger it by accident.',
     appearance: 'Appearance',
     modelSettings: 'Model Settings',
     modelSettingsDesc: 'System prompt, generation, and performance',

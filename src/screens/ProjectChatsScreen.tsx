@@ -163,6 +163,7 @@ export const ProjectChatsScreen: React.FC = () => {
   const { projectId } = route.params;
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const swipeGesturesEnabled = useAppStore(state => state.settings.swipeGesturesEnabled !== false);
   const [alertState, setAlertState] = useState<AlertState>(initialAlertState);
 
   const { getProject } = useProjectStore();
@@ -223,6 +224,7 @@ export const ProjectChatsScreen: React.FC = () => {
 
     return (
       <Swipeable
+        enabled={swipeGesturesEnabled}
         renderRightActions={() => renderChatRightActions(item)}
         overshootRight={false}
         containerStyle={styles.swipeableContainer}

@@ -6,6 +6,7 @@ import { AnimatedListItem } from '../../../components/AnimatedListItem';
 import { useTheme, useThemedStyles } from '../../../theme';
 import { createStyles } from '../styles';
 import { Conversation } from '../../../types';
+import { useAppStore } from '../../../stores';
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -44,6 +45,7 @@ export const RecentConversations: React.FC<Props> = ({
 }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const swipeGesturesEnabled = useAppStore(state => state.settings.swipeGesturesEnabled !== false);
 
   const renderRightActions = (conversation: Conversation) => (
     <TouchableOpacity
@@ -67,6 +69,7 @@ export const RecentConversations: React.FC<Props> = ({
       </View>
       {conversations.map((conv, index) => (
         <Swipeable
+        enabled={swipeGesturesEnabled}
           key={conv.id}
           renderRightActions={() => renderRightActions(conv)}
           overshootRight={false}

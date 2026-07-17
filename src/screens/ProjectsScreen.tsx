@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { useProjectStore, useChatStore } from '../stores';
 import { Project } from '../types';
 import { RootStackParamList, MainTabParamList } from '../navigation/types';
+import { useAppStore } from '../stores';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'ProjectsTab'>,
@@ -37,6 +38,7 @@ export const ProjectsScreen: React.FC = () => {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const swipeGesturesEnabled = useAppStore(state => state.settings.swipeGesturesEnabled !== false);
   const { projects, deleteProject } = useProjectStore();
   const { conversations } = useChatStore();
   const [alertState, setAlertState] = useState<AlertState>(initialAlertState);
@@ -86,6 +88,7 @@ export const ProjectsScreen: React.FC = () => {
 
     return (
       <Swipeable
+        enabled={swipeGesturesEnabled}
         renderRightActions={() => renderRightActions(item)}
         overshootRight={false}
         containerStyle={styles.swipeableContainer}

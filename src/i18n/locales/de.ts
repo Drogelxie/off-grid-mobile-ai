@@ -162,6 +162,8 @@ export const de = {
     title: 'Einstellungen',
     language: 'Sprache',
     languageDesc: 'Sprache der App ändern',
+    swipeGestures: 'Wischgesten',
+    swipeGesturesDesc: 'Listeneinträge nach links wischen zum Löschen. Ausschalten, wenn du sie versehentlich auslöst.',
     appearance: 'Erscheinungsbild',
     modelSettings: 'Modelleinstellungen',
     modelSettingsDesc: 'Systemaufforderung, Generierung und Leistung',

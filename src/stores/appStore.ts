@@ -74,6 +74,9 @@ type AppSettings = {
    *  overrides the user's choice. Defaults to false (the current default was
    *  auto-selected). */
   liteRTBackend: LiteRTBackend;
+  /** Wisch-/Touch-Gesten (Swipe-to-Delete in Listen). Abschaltbar in den
+   *  allgemeinen Einstellungen; default an. */
+  swipeGesturesEnabled: boolean;
   liteRTTemperature: number;
   liteRTTopP: number;
   liteRTMaxTokens: number;
@@ -226,6 +229,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   enabledTools: ['web_search', 'read_url', 'search_knowledge_base'],
   thinkingEnabled: false,
   liteRTBackend: 'gpu',
+  swipeGesturesEnabled: true,
   liteRTTemperature: 0.7,
   liteRTTopP: 0.9,
   liteRTMaxTokens: 4096,

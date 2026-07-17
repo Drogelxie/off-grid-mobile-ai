@@ -36,6 +36,7 @@ export const ChatsListScreen: React.FC = () => {
   const focusTrigger = useFocusTrigger();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const swipeGesturesEnabled = useAppStore(state => state.settings.swipeGesturesEnabled !== false);
   const conversations = useChatStore(s => s.conversations);
   const { deleteConversation, setActiveConversation } = useChatStore.getState();
   const { getProject } = useProjectStore();
@@ -178,6 +179,7 @@ export const ChatsListScreen: React.FC = () => {
 
     return (
       <Swipeable
+        enabled={swipeGesturesEnabled}
         renderRightActions={() => renderRightActions(item)}
         overshootRight={false}
         containerStyle={styles.swipeableContainer}

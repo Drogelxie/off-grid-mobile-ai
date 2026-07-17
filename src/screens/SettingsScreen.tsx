@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
+  Switch,
   ScrollView,
   TouchableOpacity,
   Linking,
@@ -55,6 +56,8 @@ export const SettingsScreen: React.FC = () => {
   const settingsSections = useSettingsSections();
   const { t } = useTranslation();
   const setOnboardingComplete = useAppStore((s) => s.setOnboardingComplete);
+  const swipeGesturesEnabled = useAppStore(state => state.settings.swipeGesturesEnabled !== false);
+  const updateSettings = useAppStore(state => state.updateSettings);
   const themeMode = useAppStore((s) => s.themeMode);
   const setThemeMode = useAppStore((s) => s.setThemeMode);
   const language = useAppStore((s) => s.language);
@@ -210,6 +213,23 @@ export const SettingsScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+        </AnimatedEntry>
+
+        {/* Gesten: Swipe-to-Delete in Listen — abschaltbar (Barrierefreiheit / versehentliche Wischer) */}
+        <AnimatedEntry index={1} staggerMs={40} trigger={focusTrigger}>
+          <View style={styles.themeToggleRow}>
+            <View style={styles.gestureTextWrap}>
+              <Text style={styles.themeToggleLabel}>{t('settings.swipeGestures')}</Text>
+              <Text style={styles.gestureDesc}>{t('settings.swipeGesturesDesc')}</Text>
+            </View>
+            <Switch
+              value={swipeGesturesEnabled}
+              onValueChange={(value) => updateSettings({ swipeGesturesEnabled: value })}
+              trackColor={{ false: colors.surfaceLight, true: colors.primary }}
+              thumbColor={colors.background}
+              accessibilityLabel={t('settings.swipeGestures')}
+            />
           </View>
         </AnimatedEntry>
 
@@ -420,6 +440,8 @@ const createStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
     backgroundColor: colors.surface, borderRadius: 8, padding: SPACING.md, marginBottom: SPACING.lg, ...shadows.small,
   },
   themeToggleLabel: { ...TYPOGRAPHY.body, color: colors.text },
+  gestureTextWrap: { flexShrink: 1, paddingRight: 12 },
+  gestureDesc: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   themeSelector: { flexDirection: 'row' as const, backgroundColor: colors.surfaceLight, borderRadius: 8, padding: 3, gap: 2 },
   themeSelectorOption: { width: 34, height: 30, borderRadius: 6, alignItems: 'center' as const, justifyContent: 'center' as const },
   themeSelectorOptionActive: { backgroundColor: colors.primary },
