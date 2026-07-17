@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { AppSheet } from './AppSheet';
 import { useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
-import { SPACING, TYPOGRAPHY, PRO_AHA_FEATURES } from '../constants';
+import { SPACING, TYPOGRAPHY } from '../constants';
 import { getPricingCopy } from '../utils/proPricing';
 
 interface ProAhaSheetProps {
