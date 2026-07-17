@@ -2,19 +2,19 @@ import React from 'react';
 import {
   View,
   Text,
-  ActivityIndicator,
   TouchableOpacity,
   Modal,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AttachStep } from 'react-native-spotlight-tour';
 import { ModelSelectorModal } from '../../components';
 import { AnimatedEntry } from '../../components/AnimatedEntry';
-import { llmService } from '../../services';
 import { createStyles } from './styles';
 import { useTheme } from '../../theme';
+import { getSlot, SLOTS } from '../../bootstrap/slotRegistry';
 
 type StylesType = ReturnType<typeof createStyles>;
 type ColorsType = ReturnType<typeof useTheme>['colors'];
@@ -43,19 +43,33 @@ export const NoModelScreen: React.FC<{
       </View>
     </View>
     <View style={styles.noModelContainer}>
-      <View style={styles.noModelIconContainer}>
-        <Icon name="cpu" size={32} color={colors.textMuted} />
-      </View>
-      <Text style={styles.noModelTitle}>No Model Selected</Text>
-      <Text style={styles.noModelText}>
-        {hasAvailableModels
-          ? 'Select a text or image model to get started.'
-          : 'Download a text or image model from the Models tab to get started.'}
-      </Text>
-      {hasAvailableModels && (
-        <TouchableOpacity style={styles.selectModelButton} onPress={() => setShowModelSelector(true)}>
-          <Text style={styles.selectModelButtonText}>Select Model</Text>
-        </TouchableOpacity>
+      {isModelLoading ? (
+        // A model was selected and is loading in the background. activeModelId stays
+        // null until the native load finishes, so this empty state would otherwise
+        // remain with no feedback — the user thinks nothing happened. Show a loading
+        // indicator instead of the "Select Model" prompt.
+        <>
+          <ActivityIndicator size="large" color={colors.primary} testID="no-model-loading-indicator" />
+          <Text style={[styles.noModelTitle, styles.noModelLoadingTitle]}>Loading Model</Text>
+          <Text style={styles.noModelText}>Getting your model ready. This can take a moment.</Text>
+        </>
+      ) : (
+        <>
+          <View style={styles.noModelIconContainer}>
+            <Icon name="cpu" size={32} color={colors.textMuted} />
+          </View>
+          <Text style={styles.noModelTitle}>No Model Selected</Text>
+          <Text style={styles.noModelText}>
+            {hasAvailableModels
+              ? 'Select a text or image model to get started.'
+              : 'Download a text or image model from the Models tab to get started.'}
+          </Text>
+          {hasAvailableModels && (
+            <TouchableOpacity style={styles.selectModelButton} onPress={() => setShowModelSelector(true)}>
+              <Text style={styles.selectModelButtonText}>Select Model</Text>
+            </TouchableOpacity>
+          )}
+        </>
       )}
     </View>
     <ModelSelectorModal
@@ -64,40 +78,7 @@ export const NoModelScreen: React.FC<{
       onSelectModel={onSelectModel}
       onUnloadModel={onUnloadModel}
       isLoading={isModelLoading}
-      currentModelPath={llmService.getLoadedModelPath()}
     />
-  </SafeAreaView>
-);
-
-export const LoadingScreen: React.FC<{
-  styles: StylesType;
-  colors: ColorsType;
-  navigation: any;
-  loadingModelName: string;
-  modelSize: string;
-  hasVision: boolean;
-}> = ({ styles, colors, navigation, loadingModelName, modelSize, hasVision }) => (
-  <SafeAreaView style={styles.container} edges={['top']}>
-    <View style={styles.header}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={20} color={colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Loading Model</Text>
-        </View>
-        <View style={styles.headerActions} />
-      </View>
-    </View>
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.loadingText}>Loading {loadingModelName}</Text>
-      {modelSize ? <Text style={styles.loadingSubtext}>{modelSize}</Text> : null}
-      <Text style={styles.loadingHint}>
-        Preparing model for inference. This may take a moment for larger models.
-      </Text>
-      {hasVision && <Text style={styles.loadingHint}>Vision capabilities will be enabled.</Text>}
-    </View>
   </SafeAreaView>
 );
 
@@ -105,16 +86,13 @@ export const ChatHeader: React.FC<{
   styles: StylesType;
   colors: ColorsType;
   activeConversation: any;
-  activeModel: any;
-  activeModelName?: string;
-  activeImageModel: any;
   activeProject: any;
   navigation: any;
-  setShowModelSelector: (v: boolean) => void;
+  onOpenModels: () => void;
   setShowSettingsPanel: (v: boolean) => void;
   setShowProjectSelector: (v: boolean) => void;
   isRemote?: boolean;
-}> = ({ styles, colors, activeConversation, activeModel, activeModelName, activeImageModel, activeProject, navigation, setShowModelSelector, setShowSettingsPanel, setShowProjectSelector, isRemote }) => (
+}> = ({ styles, colors, activeConversation, activeProject, navigation, onOpenModels, setShowSettingsPanel, setShowProjectSelector, isRemote }) => (
   <View style={styles.header}>
     <View style={styles.headerRow}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -125,18 +103,14 @@ export const ChatHeader: React.FC<{
           {activeConversation?.title || 'New Chat'}
         </Text>
         <View style={styles.headerSubtitleRow}>
-          <TouchableOpacity style={styles.modelSelector} onPress={() => setShowModelSelector(true)} testID="model-selector">
+          <TouchableOpacity style={styles.modelSelector} onPress={onOpenModels} testID="model-selector">
             {isRemote && (
               <Icon name="cloud" size={12} color={colors.primary} style={styles.remoteIcon} />
             )}
+            <Icon name="layers" size={12} color={colors.textSecondary} style={styles.remoteIcon} />
             <Text style={styles.headerSubtitle} numberOfLines={1} testID="model-loaded-indicator">
-              {activeModelName || activeModel?.name || 'Unknown'}
+              Models
             </Text>
-            {activeImageModel && (
-              <View style={styles.headerImageBadge}>
-                <Icon name="image" size={10} color={colors.primary} />
-              </View>
-            )}
             <Text style={styles.modelSelectorArrow}>▼</Text>
           </TouchableOpacity>
           <Text style={styles.headerSubtitleDivider}>·</Text>
@@ -146,6 +120,9 @@ export const ChatHeader: React.FC<{
               {activeProject ? activeProject.name : 'Default'}
             </Text>
           </TouchableOpacity>
+          {/* Pro-only: Chat/Voice mode dropdown, on the same line as Models ·
+              project, pushed to the right. Empty slot in free builds. */}
+          {(() => { const ModeToggle = getSlot(SLOTS.chatInputModeToggle); return ModeToggle ? <View style={styles.modeToggleWrap}><ModeToggle /></View> : null; })()}
         </View>
       </View>
       <View style={styles.headerActions}>
@@ -220,9 +197,14 @@ export const ImageProgressIndicator: React.FC<{
         )}
         <View style={styles.imageProgressContent}>
           <View style={styles.imageProgressHeader}>
-            <View style={styles.imageProgressIconContainer}>
-              <Icon name="image" size={18} color={colors.primary} />
-            </View>
+            {/* The placeholder image glyph is only meaningful BEFORE the live preview renders.
+                Once the preview thumbnail is up (Refining Image), drop it — it just overlapped
+                the real image (device 2026-07-16). */}
+            {!imagePreviewPath && (
+              <View style={styles.imageProgressIconContainer} testID="image-progress-placeholder-icon">
+                <Icon name="image" size={18} color={colors.primary} />
+              </View>
+            )}
             <View style={styles.imageProgressInfo}>
               <Text style={styles.imageProgressTitle}>
                 {imagePreviewPath ? 'Refining Image' : 'Generating Image'}

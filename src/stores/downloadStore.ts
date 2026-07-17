@@ -1,54 +1,14 @@
 import { create } from 'zustand';
 import { ModelKey } from '../utils/modelKey';
 import logger from '../utils/logger';
+// The status classification + DownloadEntry shape live in a PURE util so pure consumers can use
+// them without depending on this store (utils-stay-pure). Re-exported here for back-compat — every
+// existing `from '../stores/downloadStore'` importer of these keeps working unchanged.
+import { DownloadStatus, DownloadEntry } from '../utils/downloadStatus';
 
-export type DownloadStatus =
-  | 'pending'
-  | 'running'
-  | 'retrying'
-  | 'waiting_for_network'
-  | 'processing'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-
-export type ModelType = 'text' | 'image'
-
-export interface DownloadEntry {
-  modelKey: ModelKey
-  downloadId: string
-  modelId: string
-  fileName: string
-  quantization: string
-  modelType: ModelType
-  status: DownloadStatus
-  bytesDownloaded: number
-  totalBytes: number
-  combinedTotalBytes: number
-  progress: number
-  mmProjDownloadId?: string
-  mmProjBytesDownloaded?: number
-  mmProjStatus?: DownloadStatus
-  mmProjFileName?: string
-  mmProjFileSize?: number
-  errorMessage?: string
-  errorCode?: string
-  createdAt: number
-  metadataJson?: string
-}
-
-/**
- * Statuses that count as "an active download is in flight for this modelKey".
- * Use this to guard against duplicate starts (rapid double-tap) so we never
- * have two parallel native downloads racing on the same logical file.
- */
-const ACTIVE_STATUSES = new Set<DownloadStatus>([
-  'pending', 'running', 'retrying', 'waiting_for_network', 'processing',
-]);
-
-export function isActiveStatus(status: DownloadStatus): boolean {
-  return ACTIVE_STATUSES.has(status);
-}
+export type { DownloadStatus, DownloadEntry };
+export type { ModelType } from '../utils/downloadStatus';
+export { isActiveStatus, isQueuedStatus, isDownloadingStatus, isFailedStatus } from '../utils/downloadStatus';
 
 interface DownloadStoreState {
   downloads: Record<ModelKey, DownloadEntry>
@@ -166,7 +126,10 @@ export const useDownloadStore = create<DownloadStoreState>((set) => ({
     if (!entry || entry.downloadId !== downloadId) return state;
     const combinedTotal = entry.combinedTotalBytes || total;
     const mmProjBytes = entry.mmProjBytesDownloaded ?? 0;
-    const progress = combinedTotal > 0 ? (bytes + mmProjBytes) / combinedTotal : 0;
+    // Clamp: when combinedTotalBytes isn't set yet, the denominator is the main file
+    // only, so adding the mmproj sidecar's bytes can push this past 1.0 (the >100%
+    // progress bar). A wrong total can also overshoot. Never report >1 or <0.
+    const progress = combinedTotal > 0 ? Math.min(1, Math.max(0, (bytes + mmProjBytes) / combinedTotal)) : 0;
     return {
       downloads: {
         ...state.downloads,
@@ -197,7 +160,8 @@ export const useDownloadStore = create<DownloadStoreState>((set) => ({
       return state;
     }
     const combinedTotal = entry.combinedTotalBytes || entry.totalBytes;
-    const progress = combinedTotal > 0 ? (entry.bytesDownloaded + bytes) / combinedTotal : 0;
+    // Clamp to [0,1] — same reason as updateProgress (main-only denominator + mmproj bytes).
+    const progress = combinedTotal > 0 ? Math.min(1, Math.max(0, (entry.bytesDownloaded + bytes) / combinedTotal)) : 0;
     return {
       downloads: {
         ...state.downloads,

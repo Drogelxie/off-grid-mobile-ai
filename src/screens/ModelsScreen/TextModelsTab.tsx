@@ -4,10 +4,11 @@ import { View, Text, FlatList, TextInput, ActivityIndicator, RefreshControl, Tou
 import { useTranslation } from 'react-i18next';
 import DeviceInfo from 'react-native-device-info';
 import Icon from 'react-native-vector-icons/Feather';
+import { fileExceedsBudget } from '../../services/memoryBudget';
 import { AttachStep, useSpotlightTour } from 'react-native-spotlight-tour';
 import { Card, ModelCard } from '../../components';
 import { AnimatedEntry } from '../../components/AnimatedEntry';
-import { CustomAlert, hideAlert, showAlert } from '../../components/CustomAlert';
+import { CustomAlert, hideAlert, showAlert, AlertState } from '../../components/CustomAlert';
 import { consumePendingSpotlight, peekPendingSpotlight, setPendingSpotlight } from '../../components/onboarding/spotlightState';
 import { DOWNLOAD_MANAGER_STEP_INDEX } from '../../components/onboarding/spotlightConfig';
 import { useTheme, useThemedStyles } from '../../theme';
@@ -16,15 +17,19 @@ import { CREDIBILITY_LABELS } from '../../constants';
 import { ModelInfo, ModelFile } from '../../types';
 import { createStyles } from './styles';
 import { ModelsScreenViewModel } from './useModelsScreen';
-import { useDownloadStore, isActiveStatus } from '../../stores/downloadStore';
+import { useDownloadStore, isActiveStatus, isQueuedStatus } from '../../stores/downloadStore';
 import { makeModelKey } from '../../utils/modelKey';
+import { modelSupportsNpuGpu, isAccelerableQuant } from '../../utils/acceleration';
+import { aggregateActiveDownloads } from '../../utils/downloadAggregate';
 import { TextFiltersSection } from './TextFiltersSection';
 import { FilterState, SortOption } from './types';
 import { SORT_OPTIONS } from './constants';
 import { formatNumber, getTextModelCompatibility } from './utils';
-import { CURATED_LITERT_ENTRIES, buildCuratedLiteRTUrl, getCuratedLiteRTEntry } from '../../services/curatedLiteRTRegistry';
-import { backgroundDownloadService, modelManager } from '../../services';
-import { useAppStore } from '../../stores';
+import { curatedLiteRTDownloadWarning, LITERT_PARENT_ID } from '../../services/curatedLiteRTRegistry';
+import { LITERT_FILE_META, LITERT_RECOMMENDED_MODEL, LITERT_PARENT_RECOMMENDED } from './litertRecommended';
+import { modelManager } from '../../services';
+import { modelDownloadService } from '../../services/modelDownloadService';
+import { uniformDownloadId } from '../../services/modelDownloadService/uniformId';
 
 function hasNonSortFilters(fs: FilterState): boolean {
   return fs.orgs.length > 0 || fs.type !== 'all' || fs.source !== 'all' || fs.size !== 'all' || fs.quant !== 'all';
@@ -66,6 +71,30 @@ type DetailProps = Pick<Props,
   | 'handleDownload' | 'handleRepairMmProj' | 'handleCancelDownload' | 'handleDeleteModel'
 > & { selectedModel: ModelInfo; onBack: () => void; };
 
+// Build the file card's onDownload handler. Whether to show the curated confirm-download
+// warning is the registry's single DEVICE-AWARE decision (curatedLiteRTDownloadWarning),
+// shared with the onboarding screen — never a static per-model flag re-derived here.
+function buildFileDownloadHandler({ s, fileName, sizeBytes, ramGB, proceedDownload, setAlertState }: {
+  s: { downloaded: boolean; progress: unknown; hasFailed: boolean };
+  fileName: string;
+  sizeBytes: number; ramGB: number;
+  proceedDownload: () => void;
+  setAlertState: (state: AlertState) => void;
+}): (() => void) | undefined {
+  if (s.downloaded || s.progress || s.hasFailed) return undefined;
+  return () => {
+    const warning = curatedLiteRTDownloadWarning(fileName, sizeBytes, ramGB);
+    if (warning) {
+      setAlertState(showAlert(warning.title, warning.message, [
+        { text: 'Cancel', style: 'cancel', onPress: () => setAlertState(hideAlert()) },
+        { text: 'Download anyway', style: 'default', onPress: () => { setAlertState(hideAlert()); proceedDownload(); } },
+      ]));
+      return;
+    }
+    proceedDownload();
+  };
+}
+
 const ModelDetailView: React.FC<DetailProps> = ({
   selectedModel, modelFiles, isLoadingFiles, filterState, ramGB,
   alertState, setAlertState, onBack,
@@ -75,7 +104,6 @@ const ModelDetailView: React.FC<DetailProps> = ({
   const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
-  const { setDownloadedModels } = useAppStore();
   const { goTo } = useSpotlightTour();
 
   // If user arrived here via onboarding spotlight flow, show file card spotlight
@@ -90,6 +118,19 @@ const ModelDetailView: React.FC<DetailProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Heal the durable vision flag from the authoritative catalog: this screen KNOWS a model is vision (its
+  // repo ships an mmproj → modelFiles carry mmProjFile), so persist isVisionModel:true onto any downloaded
+  // record that lost it (old link-cleanup bug). The Download Manager has no catalog, so this makes the
+  // RECORD the single source both surfaces read — the wrench then shows consistently (device 2026-07-14).
+  useEffect(() => {
+    for (const f of modelFiles) {
+      if (!f.mmProjFile) continue;
+      const rec = getDownloadedModel(selectedModel.id, f.name);
+      if (rec?.engine === 'llama' && !rec.isVisionModel) void modelManager.markVisionModel(rec.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedModel.id, modelFiles]);
 
   const storeDownloads = useDownloadStore(state => state.downloads);
 
@@ -119,79 +160,27 @@ const ModelDetailView: React.FC<DetailProps> = ({
     return { downloadKey: modelKey, progress, downloaded, downloadedModel, needsVisionRepair, repairingVision, canCancel, hasFailed, errorMessage };
   };
 
-  const handleRetryDownload = async (modelKey: string, downloadId: string) => {
-    if (Platform.OS !== 'android') return; // iOS uses fresh download via proceedDownload
-    const store = useDownloadStore.getState();
-    const entry = store.downloads[modelKey];
-    store.setStatus(downloadId, 'pending');
-    try {
-      await backgroundDownloadService.retryDownload(downloadId);
-      if (entry?.mmProjDownloadId && entry.mmProjStatus === 'failed') {
-        useDownloadStore.getState().setStatus(entry.mmProjDownloadId, 'pending');
-        let mmProjRetried = false;
-        try {
-          await backgroundDownloadService.retryDownload(entry.mmProjDownloadId);
-          mmProjRetried = true;
-        } catch {
-          useDownloadStore.getState().setStatus(entry.mmProjDownloadId, 'failed', { message: 'Retry failed' });
-        }
-        if (mmProjRetried) modelManager.resetMmProjForRetry(downloadId);
-      }
-      modelManager.watchDownload(
-        downloadId,
-        async () => {
-          const models = await modelManager.getDownloadedModels();
-          setDownloadedModels(models);
-          const key = useDownloadStore.getState().downloadIdIndex[downloadId] ?? modelKey;
-          if (key) store.remove(key);
-        },
-        (error: Error) => {
-          store.setStatus(downloadId, 'failed', { message: error.message });
-        },
-      );
-      backgroundDownloadService.startProgressPolling();
-    } catch (error: any) {
-      store.setStatus(downloadId, 'failed', { message: error?.message ?? 'Retry failed' });
-    }
-  };
-
   const renderFileItem = ({ item, index }: { item: ModelFile; index: number }) => {
     const s = getFileCardState(item);
-    const curatedEntry = getCuratedLiteRTEntry(item.name);
     const proceedDownload = () => {
       handleDownload(selectedModel, item);
       if (peekPendingSpotlight() !== null) setTimeout(onBack, 800);
     };
-    const onDownload = !s.downloaded && !s.progress && !s.hasFailed
-      ? () => {
-        if (curatedEntry?.confirmDownload) {
-          setAlertState(showAlert(
-            curatedEntry.confirmDownload.title,
-            curatedEntry.confirmDownload.message,
-            [
-              { text: t('common.cancel'), style: 'cancel', onPress: () => setAlertState(hideAlert()) },
-              { text: 'Download anyway', style: 'default', onPress: () => { setAlertState(hideAlert()); proceedDownload(); } },
-            ],
-          ));
-          return;
-        }
-        proceedDownload();
-      }
-      : undefined;
+    const onDownload = buildFileDownloadHandler({ s, fileName: item.name, sizeBytes: item.size, ramGB, proceedDownload, setAlertState });
     const liteRTMeta = LITERT_FILE_META[item.name];
     const displayName = liteRTMeta?.displayName ?? item.name.replace('.gguf', '');
-    const recommended = liteRTMeta
-      ? { pillLabel: t('models.recommended'), highlightText: liteRTMeta.highlight }
-      : undefined;
+    const recommended = liteRTMeta ? { pillLabel: t('models.recommended'), highlightText: liteRTMeta.highlight } : undefined;
     const storeEntry = storeDownloads[s.downloadKey];
-    const failedState = s.hasFailed && s.errorMessage && storeEntry?.downloadId
+    // Retry routes through the single owner (modelDownloadService → textProvider): Android resumes the
+    // native row, iOS re-issues from the entry's metadata. The provider owns the platform decision AND
+    // the lost-downloadId case (a rehydrated app-killed entry can have no downloadId), so the failed
+    // card must render its Retry regardless of downloadId — gating on it here made iOS retry unreachable.
+    const failedState = s.hasFailed && s.errorMessage && storeEntry
       ? {
         errorMessage: s.errorMessage,
         bytesDownloaded: storeEntry.bytesDownloaded,
         totalBytes: storeEntry.combinedTotalBytes || storeEntry.totalBytes,
-        onRetry: () => Platform.OS === 'android'
-          ? handleRetryDownload(s.downloadKey, storeEntry.downloadId)
-          : proceedDownload(),
+        onRetry: () => { modelDownloadService.retry(uniformDownloadId('text', s.downloadKey)).catch(() => {}); },
         onRemove: () => handleCancelDownload(s.downloadKey),
       }
       : undefined;
@@ -199,15 +188,18 @@ const ModelDetailView: React.FC<DetailProps> = ({
       <ModelCard
         model={{ id: selectedModel.id, name: displayName, author: selectedModel.author, credibility: selectedModel.credibility }}
         file={item} downloadedModel={s.downloadedModel} isDownloaded={s.downloaded}
-        isDownloading={!!s.progress && !s.hasFailed} downloadProgress={s.progress?.progress}
+        isDownloading={!!s.progress && !s.hasFailed && !isQueuedStatus(s.progress.status)}
+        isQueued={isQueuedStatus(s.progress?.status ?? 'completed')}
+        downloadProgress={s.progress?.progress}
         downloadBytes={s.progress && !s.hasFailed ? { downloaded: s.progress.bytesDownloaded, total: s.progress.totalBytes } : undefined}
         isRepairingVision={s.repairingVision}
-        isCompatible={item.size / (1024 ** 3) < ramGB * 0.6} testID={`file-card-${index}`}
+        isCompatible={!fileExceedsBudget(item.size, ramGB)} testID={`file-card-${index}`}
         onDownload={onDownload}
         onDelete={s.downloaded ? () => handleDeleteModel(`${selectedModel.id}/${item.name}`) : undefined}
         onRepairVision={s.needsVisionRepair && !s.progress && !s.repairingVision ? () => handleRepairMmProj(selectedModel, item) : undefined}
         onCancel={s.canCancel ? () => handleCancelDownload(s.downloadKey) : undefined}
         recommended={recommended}
+        supportsAcceleration={isAccelerableQuant(item.quantization) || !!liteRTMeta}
         failedState={failedState}
       />
     );
@@ -266,15 +258,14 @@ const ModelDetailView: React.FC<DetailProps> = ({
       ) : (
         <FlatList
           data={modelFiles
-            .filter(f => f.size > 0 && f.size / (1024 ** 3) < ramGB * 0.6 && (filterState.quant === 'all' || f.name.includes(filterState.quant)))
+            .filter(f => f.size > 0 && !fileExceedsBudget(f.size, ramGB) && (filterState.quant === 'all' || f.name.includes(filterState.quant)))
             .sort((a, b) => {
-              // LiteRT files: smaller-first (E2B before E4B) — both are curated,
-              // no Q4_K_M concept, and the smaller variant fits more devices.
-              if (selectedModel.id === LITERT_PARENT_ID) return a.size - b.size;
-              const aRec = a.name.includes('Q4_K_M') ? 0 : 1;
-              const bRec = b.name.includes('Q4_K_M') ? 0 : 1;
-              if (aRec !== bRec) return aRec - bRec;
-              return b.size - a.size;
+              if (selectedModel.id === LITERT_PARENT_ID) return a.size - b.size; // curated: small-first
+              // Tier: Q4_K_M (CPU default, lowest size) → GPU/NPU Q4_0/Q8_0 → rest (CPU
+              // fallback). Accelerable tier small-first (Q4_0 before Q8_0); others size desc.
+              const tier = (f: ModelFile) => f.name.includes('Q4_K_M') ? 0 : isAccelerableQuant(f.quantization) ? 1 : 2;
+              if (tier(a) !== tier(b)) return tier(a) - tier(b);
+              return tier(a) === 1 ? a.size - b.size : b.size - a.size;
             })}
           renderItem={renderFileItem}
           keyExtractor={item => item.name}
@@ -285,45 +276,6 @@ const ModelDetailView: React.FC<DetailProps> = ({
       <CustomAlert {...alertState} onClose={() => setAlertState(hideAlert())} />
     </View>
   );
-};
-
-export const LITERT_PARENT_ID = 'offgrid/litert-recommended';
-
-// LiteRT-specific per-file metadata (display name + highlight) used to render
-// individual file cards in the detail view. Derived from the curated registry —
-// the registry is the single source of truth; this map is just a UI-shaped view.
-export const LITERT_FILE_META: Record<string, { displayName: string; highlight: string }> =
-  Object.fromEntries(
-    CURATED_LITERT_ENTRIES.map(e => [e.fileName, { displayName: e.displayName, highlight: e.highlight }]),
-  );
-
-// Synthetic parent ModelInfo whose `files` are derived from the curated registry.
-// Adding a new curated LiteRT model only requires updating the registry — this
-// list, the display map above, and the download flow all pick it up automatically.
-export const LITERT_RECOMMENDED_MODEL: ModelInfo = {
-  id: LITERT_PARENT_ID,
-  name: 'Gemma 4 LiteRT',
-  author: 'google',
-  description: 'Hardware-accelerated inference with vision support.',
-  downloads: 0, likes: 0, tags: ['litert'], lastModified: '',
-  modelType: 'vision',
-  files: CURATED_LITERT_ENTRIES.map(e => ({
-    name: e.fileName,
-    size: e.sizeBytes,
-    // Repurpose the quant chip slot as an engine label for curated LiteRT
-    // entries. Llama files keep their real quant strings (Q4_K_M etc.); this
-    // value never appears on a .gguf card. Mixed-precision is what the actual
-    // weights use, but "LiteRT" is what's useful to the reader.
-    quantization: 'LiteRT',
-    downloadUrl: buildCuratedLiteRTUrl(e),
-    liteRTVision: e.liteRTVision,
-  })),
-};
-
-const LITERT_PARENT_RECOMMENDED = {
-  pillLabel: 'Recommended',
-  chips: ['Vision', 'GPU'],
-  highlightText: 'Hardware-accelerated inference with vision support',
 };
 
 const DeviceBanner: React.FC<{ ramGB: number; rec: { maxParameters: number; recommendedQuantization: string }; showTitle: boolean; styles: any }> = ({ ramGB, rec, showTitle, styles }) => (
@@ -342,11 +294,14 @@ const ModelListItem: React.FC<ModelListItemProps> = ({ item, index, focusTrigger
   const { isCompatible, incompatibleReason } = getTextModelCompatibility(item);
   const isLiteRTParent = item.id === LITERT_PARENT_ID;
   const recommended = isLiteRTParent ? { ...LITERT_PARENT_RECOMMENDED, pillLabel: t('models.recommended') } : undefined;
-  // Strip files for the LiteRT parent so ModelCard doesn't render the size-range
-  // and "N files" badges — the curated chips already convey the relevant info.
-  // The original item (with files) still flows through onPress → handleSelectModel.
+  // Aggregate ALL in-flight entries for this model (main+mmproj / grouped LiteRT) into
+  // cumulative progress/bytes + a download count, so the card shows total, not one entry.
+  const downloads = useDownloadStore(s => s.downloads);
+  const agg = React.useMemo(() => aggregateActiveDownloads(downloads, item.id), [downloads, item.id]);
+  // Strip files for the LiteRT parent so ModelCard skips the size-range / "N files"
+  // badges (curated chips cover it); the original item still flows through onPress.
   const cardModel = isLiteRTParent ? { ...item, files: undefined } : item;
-  const card = (<AnimatedEntry index={index} staggerMs={30} trigger={focusTrigger}><ModelCard model={cardModel} isDownloaded={isDownloaded} isCompatible={isCompatible} incompatibleReason={incompatibleReason} onPress={isCompatible ? onPress : undefined} testID={`model-card-${index}`} compact isTrending={isTrending} recommended={recommended} /></AnimatedEntry>);
+  const card = (<AnimatedEntry index={index} staggerMs={30} trigger={focusTrigger}><ModelCard model={cardModel} isDownloaded={isDownloaded} isDownloading={agg.downloading} isQueued={agg.queued} downloadProgress={agg.progress} downloadBytes={agg.bytes} downloadCount={agg.count} isCompatible={isCompatible} incompatibleReason={incompatibleReason} onPress={isCompatible ? onPress : undefined} testID={`model-card-${index}`} compact isTrending={isTrending} recommended={recommended} supportsAcceleration={!isLiteRTParent && modelSupportsNpuGpu(item)} /></AnimatedEntry>);
   return index === 0 ? <AttachStep index={0} fill>{card}</AttachStep> : card;
 };
 

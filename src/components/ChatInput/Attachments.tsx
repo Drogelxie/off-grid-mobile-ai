@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useTheme, useThemedStyles } from '../../theme';
 import { MediaAttachment } from '../../types';
 import { documentService } from '../../services/documentService';
+import { audioSessionManager } from '../../services/audioSessionManager';
 import { AlertState, showAlert, hideAlert } from '../CustomAlert';
 import { createStyles } from './styles';
 import { isPickerStuck } from '../../utils/pickerErrorUtils';
@@ -40,19 +41,33 @@ export function useAttachments(setAlertState: (state: AlertState) => void) {
 
   const pickFromLibrary = async () => {
     try {
+      // Release the iOS audio session first: in voice mode the active playback session
+      // collides with the native picker and hangs the app (device 2026-07-15). No-op on
+      // Android and when no session is active.
+      await audioSessionManager.deactivate();
       const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8, maxWidth: 1024, maxHeight: 1024 });
       if (result.assets && result.assets.length > 0) addAttachments(result.assets);
     } catch (_pickError) {
       // no-op: image picker already reports failure to the user via native UI
+    } finally {
+      // Re-assert the playback session: if the user CANCELS the picker we deactivated for, voice
+      // mode would otherwise stay muted until the next audio action (Gitar). iOS-only no-op on Android.
+      audioSessionManager.ensurePlayback().catch(() => {});
     }
   };
 
   const pickFromCamera = async () => {
     try {
+      // Release the iOS audio session first (see pickFromLibrary): the camera grabs audio
+      // hardware and collides with an active voice-mode session. No-op on Android.
+      await audioSessionManager.deactivate();
       const result = await launchCamera({ mediaType: 'photo', quality: 0.8, maxWidth: 1024, maxHeight: 1024 });
       if (result.assets && result.assets.length > 0) addAttachments(result.assets);
     } catch (_cameraError) {
       // no-op: camera picker already reports failure to the user via native UI
+    } finally {
+      // Re-assert the playback session on cancel/return so voice mode isn't left muted (Gitar).
+      audioSessionManager.ensurePlayback().catch(() => {});
     }
   };
 
@@ -111,9 +126,30 @@ export function useAttachments(setAlertState: (state: AlertState) => void) {
     }
   };
 
+  const addAudioAttachment = (audio: {
+    uri: string;
+    audioFormat: 'wav' | 'mp3';
+    audioDurationSeconds?: number;
+    transcription?: string;
+  }) => {
+    const attachment: MediaAttachment = {
+      id: nextAttachmentId(),
+      type: 'audio',
+      uri: audio.uri,
+      audioFormat: audio.audioFormat,
+      audioDurationSeconds: audio.audioDurationSeconds,
+      fileName: audio.uri.split('/').pop(),
+      // Reuse `textContent` (the attachment's associated text) for the whisper
+      // transcription. This is display-only for audio: llmMessages sends the
+      // transcription to the model via `message.content`, never from here.
+      ...(audio.transcription?.trim() ? { textContent: audio.transcription.trim() } : {}),
+    };
+    setAttachments(prev => [...prev, attachment]);
+  };
+
   const clearAttachments = () => setAttachments([]);
 
-  return { attachments, removeAttachment, clearAttachments, handlePickImage, handlePickDocument };
+  return { attachments, removeAttachment, clearAttachments, handlePickImage, handlePickDocument, addAudioAttachment };
 }
 
 // ─── AttachmentPreview component ─────────────────────────────────────────────
@@ -121,9 +157,13 @@ export function useAttachments(setAlertState: (state: AlertState) => void) {
 interface AttachmentPreviewProps {
   attachments: MediaAttachment[];
   onRemove: (id: string) => void;
+  /** Tapping an image thumbnail opens the shared fullscreen image viewer (same
+   * handler the in-message generated/attached images use). Optional so the
+   * component still renders without a viewer wired up. */
+  onImagePress?: (uri: string) => void;
 }
 
-export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({ attachments, onRemove }) => {
+export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({ attachments, onRemove, onImagePress }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -140,11 +180,22 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({ attachment
       {attachments.map(attachment => (
         <View key={attachment.id} testID={`attachment-preview-${attachment.id}`} style={styles.attachmentPreview}>
           {attachment.type === 'image' ? (
-            <Image
+            <TouchableOpacity
               testID={`attachment-image-${attachment.id}`}
-              source={{ uri: attachment.uri }}
-              style={styles.attachmentImage}
-            />
+              activeOpacity={0.8}
+              disabled={!onImagePress}
+              onPress={() => onImagePress?.(attachment.uri)}
+            >
+              <Image
+                source={{ uri: attachment.uri }}
+                style={styles.attachmentImage}
+              />
+            </TouchableOpacity>
+          ) : attachment.type === 'audio' ? (
+            <View testID={`audio-preview-${attachment.id}`} style={styles.documentPreview}>
+              <Icon name="mic" size={24} color={colors.primary} />
+              <Text style={styles.documentName} numberOfLines={2}>Voice</Text>
+            </View>
           ) : (
             <View testID={`document-preview-${attachment.id}`} style={styles.documentPreview}>
               <Icon name="file-text" size={24} color={colors.primary} />

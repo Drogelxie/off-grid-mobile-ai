@@ -1,6 +1,7 @@
 import { Platform, NativeModules } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import RNFS from 'react-native-fs';
+import logger from '../utils/logger';
 // Access NativeModules.LocalDreamModule dynamically (not destructured)
 // so it can be mocked in tests after module import.
 const getLocalDreamModule = () => NativeModules.LocalDreamModule;
@@ -12,6 +13,7 @@ import {
   ImageModelRecommendation,
 } from '../types';
 import { MODEL_RECOMMENDATIONS, RECOMMENDED_MODELS } from '../constants';
+import { HTP_ENABLED } from '../config/featureFlags';
 /**
  * QNN variant tiers — mirrors local-dream's chipsetModelSuffixes map exactly.
  * Source: https://github.com/xororz/local-dream — Model.kt getChipsetSuffix()
@@ -49,13 +51,84 @@ class HardwareService {
     this.cachedDeviceInfo = {
       totalMemory,
       usedMemory,
-      availableMemory: totalMemory - usedMemory,
+      availableMemory: await this.computeAvailableBytes(totalMemory, usedMemory),
       deviceModel,
       systemName,
       systemVersion,
       isEmulator,
     };
+    logger.log(`[WIRE-DEVICE] ${JSON.stringify({ platform: Platform.OS, ...this.cachedDeviceInfo })}`); // [WIRE] real device caps (drives onboarding recs + memory budget)
     return this.cachedDeviceInfo;
+  }
+  /**
+   * Real free memory the system can hand out RIGHT NOW. On Android this reads
+   * `MemAvailable` from /proc/meminfo (what the kernel will give without
+   * swapping) — NOT `total − thisApp'sUsage`, which ignores every other app and
+   * the OS and wildly over-reports on a loaded device (the cause of the OOM
+   * freeze: the budget thought ~11GB was free when ~1.3GB was). Falls back to
+   * total − used if /proc is unreadable or on iOS.
+   */
+  private async computeAvailableBytes(totalMemory: number, usedMemory: number): Promise<number> {
+    // PREFER the real per-process headroom from DeviceMemoryModule — the only
+    // number that means "the OS will actually give this process this much before
+    // jetsam" (iOS os_proc_available_memory, which reflects the increased-memory
+    // entitlement; Android ActivityManager.availMem). One uniform contract across
+    // platforms. Fall back to Android /proc, then total−used (a known over-report,
+    // last resort) so the budget degrades gracefully if the module is absent.
+    const proc = await this.readProcessAvailableBytes();
+    if (proc != null) return proc;
+    const sys = await this.readSystemAvailableBytes();
+    return sys != null ? sys : totalMemory - usedMemory;
+  }
+  /** Real per-process available memory (bytes) via the native module — same on
+   *  iOS and Android. null when the module is unavailable. */
+  private async readProcessAvailableBytes(): Promise<number | null> {
+    const mod = NativeModules.DeviceMemoryModule;
+    if (!mod?.getMemoryInfo) return null;
+    try {
+      const info = await mod.getMemoryInfo();
+      logger.log(`[WIRE-RAM] ${JSON.stringify({ platform: Platform.OS, info })}`); // [WIRE] raw DeviceMemoryModule shape from-device
+      const bytes = Number(info?.processAvailableBytes);
+      return Number.isFinite(bytes) && bytes > 0 ? bytes : null;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * The full per-process memory picture (MB) for diagnostics: what iOS will still let
+   * this process allocate (available), its current footprint, and the derived process
+   * LIMIT (available + footprint) — the number that explains a "not enough memory"
+   * refusal on a high-RAM device (it's the OS cap on the app, not the physical RAM).
+   * null when the native module is unavailable.
+   */
+  async getProcessMemory(): Promise<{ availableMB: number; footprintMB: number; limitMB: number } | null> {
+    const mod = NativeModules.DeviceMemoryModule;
+    if (!mod?.getMemoryInfo) return null;
+    try {
+      const info = await mod.getMemoryInfo();
+      const availB = Number(info?.processAvailableBytes) || 0;
+      const footB = Number(info?.footprintBytes) || 0;
+      const MB = 1024 * 1024;
+      return {
+        availableMB: Math.round(availB / MB),
+        footprintMB: Math.round(footB / MB),
+        limitMB: Math.round((availB + footB) / MB),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async readSystemAvailableBytes(): Promise<number | null> {
+    if (Platform.OS !== 'android') return null;
+    try {
+      const meminfo = await RNFS.readFile('/proc/meminfo', 'utf8');
+      const match = /MemAvailable:\s+(\d+)\s*kB/.exec(meminfo);
+      if (match) return Number.parseInt(match[1], 10) * 1024;
+    } catch {
+      /* /proc unreadable — fall back to the DeviceInfo estimate */
+    }
+    return null;
   }
   async refreshMemoryInfo(): Promise<DeviceInfoType> {
     // Force fresh fetch of all memory info
@@ -69,7 +142,7 @@ class HardwareService {
     if (this.cachedDeviceInfo) {
       this.cachedDeviceInfo.totalMemory = totalMemory;
       this.cachedDeviceInfo.usedMemory = usedMemory;
-      this.cachedDeviceInfo.availableMemory = totalMemory - usedMemory;
+      this.cachedDeviceInfo.availableMemory = await this.computeAvailableBytes(totalMemory, usedMemory);
     }
     return this.cachedDeviceInfo!;
   }
@@ -192,6 +265,36 @@ class HardwareService {
   estimateModelRam(model: { fileSize?: number; size?: number; mmProjFileSize?: number }, multiplier = 1.5): number {
     return this.getModelTotalSize(model) * multiplier;
   }
+  /**
+   * Whether iOS Core ML image generation should run on the GPU (vs the Neural
+   * Engine). On iOS 26 the ANE is degraded for these palettized diffusion models:
+   * on devices with enough RAM (e.g. iPhone 15 Pro, 8GB) the ANE load fails
+   * outright, so GPU is the only working path; on smaller devices (e.g. iPhone
+   * 15, 6GB) the GPU's system-RAM buffers OOM, so the ANE — slower, but a far
+   * smaller system-RAM footprint — is the only path that fits. Pre-26 iOS keeps
+   * the ANE (fast + low memory there). Android uses a different backend entirely.
+   */
+  preferGpuForImageGen(): boolean {
+    if (Platform.OS !== 'ios') return false;
+    const iosMajor = parseInt(String(Platform.Version), 10);
+    if (Number.isNaN(iosMajor) || iosMajor < 26) return false;
+    return this.getTotalMemoryGB() >= 7; // 8GB-class devices report ~7.4GB
+  }
+
+  /**
+   * Image diffusion models hold a larger runtime working set than their file
+   * size — UNet activations and VAE decode buffers. The multiplier tracks the
+   * compute path: the GPU keeps buffers in system RAM (~2.5×), while the iOS
+   * Neural Engine holds weights off-heap so its system-RAM footprint is far
+   * smaller (~1.8×). Picking the multiplier from preferGpuForImageGen keeps the
+   * residency estimate consistent with the path the model will actually load on,
+   * so the gate doesn't refuse an ANE load that fits (nor admit a GPU load that
+   * OOMs). Android (ONNX/QNN reserves accelerator memory up front) keeps 2.5×.
+   */
+  estimateImageModelRam(model: { fileSize?: number; size?: number; mmProjFileSize?: number }): number {
+    const multiplier = Platform.OS === 'ios' && !this.preferGpuForImageGen() ? 1.8 : 2.5;
+    return this.estimateModelRam(model, multiplier);
+  }
   formatModelRam(model: { fileSize?: number; size?: number; mmProjFileSize?: number }, multiplier = 1.5): string {
     return `~${(this.estimateModelRam(model, multiplier) / (1024 * 1024 * 1024)).toFixed(1)} GB`;
   }
@@ -232,6 +335,7 @@ class HardwareService {
       hasNPU: vendor === 'qualcomm' && !!qnnVariant,
       qnnVariant,
     };
+    logger.log(`[WIRE-DEVICE-SOC] ${JSON.stringify({ hardware, model, ...this.cachedSoCInfo })}`); // [WIRE] real SoC/NPU detection (drives qnn image-backend gate)
     return this.cachedSoCInfo;
   }
   private async getQnnVariantFromSoC(): Promise<
@@ -334,6 +438,19 @@ class HardwareService {
     const cores = await this.getCpuCoreCount();
     return cores <= 4 ? cores : Math.floor(cores * 0.8);
   }
+  /**
+   * The device's llama.rn hardware-acceleration options, composed ONCE from the same
+   * probes the Inference-Backend settings use: NPU/HTP (Qualcomm Hexagon, gated by the
+   * HTP feature flag) and GPU/OpenCL (Adreno/Mali). This is the single source for "can
+   * this device go faster than CPU?", so the settings screen and the chat acceleration
+   * tip agree instead of each re-deriving it.
+   */
+  async getAccelerationCapability(): Promise<{ hasNpu: boolean; hasGpu: boolean }> {
+    if (Platform.OS !== 'android') return { hasNpu: false, hasGpu: false };
+    const [soc, opencl] = await Promise.all([this.getSoCInfo(), this.getOpenCLCapability()]);
+    return { hasNpu: HTP_ENABLED && soc.hasNPU, hasGpu: opencl.supported };
+  }
+
   async getOpenCLCapability(): Promise<{ supported: boolean; reason?: string }> {
     if (this.cachedOpenCLCapability) return this.cachedOpenCLCapability;
     if (Platform.OS !== 'android') return { supported: false, reason: 'not_android' };

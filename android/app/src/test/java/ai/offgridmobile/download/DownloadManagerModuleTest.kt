@@ -3,6 +3,7 @@ package ai.offgridmobile.download
 import android.app.Application
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -209,5 +210,98 @@ class DownloadManagerModuleTest {
         assertEquals("queued", retryQueuedStatus.name.lowercase())
     }
 
+    // ── WorkerDownload.calculateTotalBytes ────────────────────────────────────
+
+    @Test
+    fun calculateTotalBytesUsesServerContentLengthOn200() {
+        // A fresh 200 download: the server's Content-Length is authoritative.
+        val total = WorkerDownload.calculateTotalBytes(
+            code = 200,
+            currentFileBytes = 0L,
+            contentLength = 77_704_715L,
+            existingTotal = 0L,
+        )
+        assertEquals(77_704_715L, total)
+    }
+
+    @Test
+    fun calculateTotalBytesDoesNotClampRealLengthUpToSeededEstimate() {
+        // Regression: Whisper seeds existingTotal from a rounded MB figure
+        // (75 * 1024 * 1024 = 78_643_200) while the real file is 77_704_715 bytes.
+        // The old code did .coerceAtLeast(existingTotal), inflating the expected
+        // size to the rounded seed; the completion size check (0.1% tolerance) then
+        // deleted every Whisper model as FILE_CORRUPTED. The real Content-Length
+        // must win so actual == expected and validation passes.
+        val seeded = 75L * 1024L * 1024L
+        val total = WorkerDownload.calculateTotalBytes(
+            code = 200,
+            currentFileBytes = 0L,
+            contentLength = 77_704_715L,
+            existingTotal = seeded,
+        )
+        assertEquals(77_704_715L, total)
+        assertTrue("real length must not be inflated to the seeded estimate", total < seeded)
+    }
+
+    @Test
+    fun calculateTotalBytesFallsBackToSeededEstimateWhenServerOmitsLength() {
+        // OkHttp returns -1 from contentLength() when the server sends no length.
+        // Only then do we fall back to the caller's seeded estimate.
+        val seeded = 78_643_200L
+        val total = WorkerDownload.calculateTotalBytes(
+            code = 200,
+            currentFileBytes = 0L,
+            contentLength = -1L,
+            existingTotal = seeded,
+        )
+        assertEquals(seeded, total)
+    }
+
+    @Test
+    fun calculateTotalBytesAddsExistingBytesForRangedResume() {
+        // 206 Partial Content: total = bytes already on disk + remaining length.
+        val total = WorkerDownload.calculateTotalBytes(
+            code = 206,
+            currentFileBytes = 10_000_000L,
+            contentLength = 67_704_715L,
+            existingTotal = 0L,
+        )
+        assertEquals(77_704_715L, total)
+    }
+
+    @Test
+    fun calculateTotalBytesResumeFallsBackToSeededEstimateWhenLengthMissing() {
+        val seeded = 77_704_715L
+        val total = WorkerDownload.calculateTotalBytes(
+            code = 206,
+            currentFileBytes = 10_000_000L,
+            contentLength = -1L,
+            existingTotal = seeded,
+        )
+        assertEquals(seeded, total)
+    }
+
+    // ── Foreground-service download notification (F8) ─────────────────────────
+
+    @Test
+    fun buildForegroundInfoUsesDataSyncServiceType() {
+        val ctx = org.robolectric.RuntimeEnvironment.getApplication()
+        val info = WorkerDownload.buildForegroundInfo(ctx, "gemma-4-Q8_0.gguf")
+        // On SDK 33 the FGS type MUST be dataSync, or startForeground throws on Android 14+.
+        assertEquals(
+            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+            info.foregroundServiceType,
+        )
+        assertNotNull(info.notification)
+    }
+
+    @Test
+    fun ensureNotificationChannelCreatesTheDownloadChannel() {
+        val ctx = org.robolectric.RuntimeEnvironment.getApplication()
+        WorkerDownload.ensureNotificationChannel(ctx)
+        val mgr = ctx.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
+            as android.app.NotificationManager
+        assertNotNull(mgr.getNotificationChannel("model_downloads"))
+    }
 }
 

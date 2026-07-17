@@ -1,34 +1,63 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Linking, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
-import { useTranslation } from 'react-i18next';
+import { Button } from '../../components';
 import { useTheme, useThemedStyles } from '../../theme';
 import type { ThemeColors, ThemeShadows } from '../../theme';
-import { SPACING, TYPOGRAPHY } from '../../constants';
-import { PRO_URL } from '../../utils/proPrompt';
+import { SPACING, TYPOGRAPHY, OFF_GRID_DESKTOP_URL } from '../../constants';
 import { useAppStore } from '../../stores';
+import { PRO_PAY_PAGE_URL } from '../../services/proLicenseService';
+import { withUtm } from '../../utils/utm';
+import { loadProFeatures } from '../../bootstrap/loadProFeatures';
+import { getPricingCopy } from '../../utils/proPricing';
+import { ProManageSection } from './ProManageSection';
+import { ProUnlockModal } from './ProUnlockModal';
 
-const INTEGRATIONS_ICONS = ['mic', 'calendar', 'mail', 'message-square'];
+// Off Grid AI Pro is the ambient intelligence layer across desktop + phone, not a
+// mobile feature list. These pillars mirror the early-access page framing.
+const PILLARS = [
+  {
+    icon: 'layers',
+    title: 'Ambient across your life',
+    desc: 'A quiet layer in the background - your laptop, your phone, the meetings in the room, the tabs you read.',
+  },
+  {
+    icon: 'sunrise',
+    title: 'Proactive, not reactive',
+    desc: 'It briefs you on the day, surfaces what you left open, and drafts the reply before you remember you owe it.',
+  },
+  {
+    icon: 'shield',
+    title: 'Private by architecture',
+    desc: 'The model runs on your own hardware. No training on your data, no server to leak. Open source, so you can check.',
+  },
+  {
+    icon: 'refresh-cw',
+    title: 'One mind across devices',
+    desc: 'Your laptop knows your work, your phone knows your life. They sync over your own network, never a cloud relay.',
+  },
+  {
+    icon: 'check-circle',
+    title: 'It acts, you approve',
+    desc: 'It drafts the reply, files the ticket, updates the doc - never on its own. Every action is yours to approve.',
+  },
+];
 
 export const ProDetailScreen: React.FC = () => {
-  const { t } = useTranslation();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
-  const setHasRegisteredPro = useAppStore((s) => s.setHasRegisteredPro);
+  const hasRegisteredPro = useAppStore((s) => s.hasRegisteredPro);
+  const [verifyModalVisible, setVerifyModalVisible] = useState(false);
+  const pricing = getPricingCopy();
 
-  const INTEGRATIONS = [
-    { icon: INTEGRATIONS_ICONS[0], title: t('proDetail.voice'), desc: t('proDetail.voiceDesc') },
-    { icon: INTEGRATIONS_ICONS[1], title: t('proDetail.calendar'), desc: t('proDetail.calendarDesc') },
-    { icon: INTEGRATIONS_ICONS[2], title: t('proDetail.email'), desc: t('proDetail.emailDesc') },
-    { icon: INTEGRATIONS_ICONS[3], title: t('proDetail.messaging'), desc: t('proDetail.messagingDesc') },
-  ];
+  const openPayPage = () => { Linking.openURL(withUtm(PRO_PAY_PAGE_URL, 'pro-detail')).catch(() => {}); };
+  const openDesktop = () => { Linking.openURL(withUtm(OFF_GRID_DESKTOP_URL, 'pro-detail')).catch(() => {}); };
+  const openVerifyModal = () => setVerifyModalVisible(true);
 
-  const handleCTA = () => {
-    setHasRegisteredPro(true);
-    Linking.openURL(PRO_URL);
-  };
+  // Activation verified: load the pro bundle now so Pro lights up live (the
+  // reactive appRoot slot mounts the engine without a restart). Registries dedupe.
+  const handleUnlocked = () => { loadProFeatures(true).catch(() => {}); };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -50,107 +79,125 @@ export const ProDetailScreen: React.FC = () => {
                 <View style={styles.logoDot} />
               </View>
             </View>
-            <Text style={styles.logoText}>Off Grid Pro</Text>
+            <Text style={styles.logoText}>Off Grid AI Pro</Text>
           </View>
-          <TouchableOpacity style={styles.getProButton} onPress={handleCTA}>
-            <Text style={styles.getProButtonText}>{t('proDetail.getPro')}</Text>
-          </TouchableOpacity>
+          {hasRegisteredPro ? (
+            <View style={styles.proActiveBadge}>
+              <Icon name="check" size={12} color={colors.primary} />
+              <Text style={styles.proActiveBadgeText}>Pro Active</Text>
+            </View>
+          ) : (
+            <View style={styles.headerActions}>
+              {/* License-key entry, discoverable without scrolling. */}
+              <TouchableOpacity
+                style={styles.headerKeyButton}
+                onPress={openVerifyModal}
+                accessibilityLabel="I have a license key"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon name="key" size={16} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.getProButton} onPress={openPayPage}>
+                <Text style={styles.getProButtonText}>Get Pro</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        {/* Hero */}
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>{t('proDetail.heroTitle')}</Text>
-          <Text style={styles.heroPrimary}>{t('proDetail.heroPrimary')}</Text>
-          <Text style={styles.heroSubtitle}>{t('proDetail.heroSubtitle')}</Text>
-        </View>
+        {hasRegisteredPro ? (
+          /* Pro active: skip the marketing, show subscription + devices. */
+          <ProManageSection />
+        ) : (
+          <>
+            {/* Hero */}
+            <View style={styles.hero}>
+              <Text style={styles.heroTitle}>Intelligence, democratized.</Text>
+              <Text style={styles.heroPrimary}>On your device.</Text>
+              <Text style={styles.heroSubtitle}>
+                Ambient and proactive. It sees your day, remembers it, and gets ahead of you - and the model runs on your own hardware, so nothing is sent anywhere.
+              </Text>
+            </View>
 
-        {/* Promo Banner */}
-        <View style={styles.promoBannerWrapper}>
-          <LinearGradient
-            colors={['#2D4A38', '#1C2B22', '#141F19']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.promoOfferRow}>
-            <Icon name="star" size={13} color={colors.primary} />
-            <Text style={styles.promoOfferLabel}>{t('proDetail.limitedTimeOffer')}</Text>
-          </View>
-          <Text style={styles.promoTitle}>{t('proDetail.lifetimeAccess')}</Text>
-          <Text style={styles.promoSubtitle}>{t('proDetail.unlockAllIntegrations')}</Text>
-        </View>
-
-        {/* Core Integrations */}
-        <View style={styles.integrationsSection}>
-          <Text style={styles.sectionLabel}>{t('proDetail.coreIntegrations')}</Text>
-
-          <View style={styles.gridRow}>
-            {INTEGRATIONS.slice(0, 2).map(item => (
-              <View key={item.title} style={styles.gridCard}>
-                <View style={styles.gridIconWrap}>
-                  <Icon name={item.icon} size={20} color={colors.primary} />
-                </View>
-                <Text style={styles.gridCardTitle}>{item.title}</Text>
-                <Text style={styles.gridCardDesc}>{item.desc}</Text>
+            {/* Pricing — flat themed surface, flips at the July 1 cutover. */}
+            <View style={styles.pricingBanner}>
+              <View style={styles.pricingLabelRow}>
+                <Icon name="zap" size={13} color={colors.primary} />
+                <Text style={styles.pricingLabel}>{pricing.label}</Text>
               </View>
-            ))}
-          </View>
+              <Text style={styles.pricingTitle}>{pricing.title}</Text>
+              <Text style={styles.pricingSubtitle}>{pricing.subtitle}</Text>
+            </View>
 
-          <View style={styles.gridRow}>
-            {INTEGRATIONS.slice(2, 4).map(item => (
-              <View key={item.title} style={styles.gridCard}>
-                <View style={styles.gridIconWrap}>
-                  <Icon name={item.icon} size={20} color={colors.primary} />
+            {/* Ambient pillars */}
+            <View style={styles.pillarsSection}>
+              <Text style={styles.sectionLabel}>ONE PRIVATE LAYER</Text>
+              {PILLARS.map((p) => (
+                <View key={p.title} style={styles.pillarRow}>
+                  <View style={styles.pillarIconWrap}>
+                    <Icon name={p.icon} size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.pillarText}>
+                    <Text style={styles.pillarTitle}>{p.title}</Text>
+                    <Text style={styles.pillarDesc}>{p.desc}</Text>
+                  </View>
                 </View>
-                <Text style={styles.gridCardTitle}>{item.title}</Text>
-                <Text style={styles.gridCardDesc}>{item.desc}</Text>
-              </View>
-            ))}
-          </View>
+              ))}
+              <Text style={styles.julyNote}>
+                We are building this through July. The full layer lands over the month, added as it ships.
+              </Text>
+            </View>
 
-          {/* MCP Access full-width */}
-          <View style={styles.mcpCard}>
-            <LinearGradient
-              colors={isDark ? ['#141414', '#141414', '#1A2B1E'] : ['#FFFFFF', '#FFFFFF', '#E8F5EE']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFill}
+            {/* CTAs — shared Button (outline). Buy is primary, verify is secondary. */}
+            <Button
+              title={pricing.cta}
+              variant="primary"
+              size="large"
+              onPress={openPayPage}
+              style={styles.ctaButton}
             />
-            <View style={styles.mcpIconWrap}>
-              <Icon name="cpu" size={20} color={colors.primary} />
-            </View>
-            <View style={styles.mcpContent}>
-              <View style={styles.mcpTitleRow}>
-                <Text style={styles.mcpTitle}>{t('proDetail.mcpAccess')}</Text>
-                <View style={styles.advancedBadge}>
-                  <Text style={styles.advancedBadgeText}>{t('proDetail.advanced')}</Text>
-                </View>
-              </View>
-              <Text style={styles.mcpDesc}>{t('proDetail.mcpDesc')}</Text>
-            </View>
+            <Button
+              title="I have a license key"
+              variant="secondary"
+              onPress={openVerifyModal}
+              style={styles.verifyButton}
+            />
+          </>
+        )}
+
+        {/* Cross-device companion. Pro is one mind across laptop + phone, so every
+            Pro surface points to Off Grid AI Desktop. Shown in both states. */}
+        <TouchableOpacity
+          style={styles.desktopRow}
+          onPress={openDesktop}
+          accessibilityRole="link"
+          accessibilityLabel="Get Off Grid AI Desktop"
+        >
+          <View style={styles.desktopIconWrap}>
+            <Icon name="monitor" size={18} color={colors.primary} />
           </View>
-        </View>
-
-        {/* CTA */}
-        <TouchableOpacity style={styles.ctaButton} onPress={handleCTA}>
-          <Text style={styles.ctaText}>{t('proDetail.iAmIn')}</Text>
-          <Icon name="zap" size={16} color="#FFFFFF" />
+          <View style={styles.desktopText}>
+            <Text style={styles.desktopTitle}>Get Off Grid AI Desktop</Text>
+            <Text style={styles.desktopDesc}>
+              Free for your Mac. Run your models there and use them from this phone over your own network.
+            </Text>
+          </View>
+          <Icon name="external-link" size={16} color={colors.textMuted} />
         </TouchableOpacity>
-
       </ScrollView>
+
+      <ProUnlockModal
+        visible={verifyModalVisible}
+        onClose={() => setVerifyModalVisible(false)}
+        onUnlocked={handleUnlocked}
+      />
     </SafeAreaView>
   );
 };
 
 const createStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   flex: { flex: 1 },
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    paddingBottom: SPACING.xxl,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { paddingBottom: SPACING.xxl },
 
   // Header
   header: {
@@ -160,46 +207,47 @@ const createStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
   },
-  logoRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: SPACING.sm,
-  },
+  logoRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: SPACING.sm },
   logoGrid: { gap: 3 },
   logoDotRow: { flexDirection: 'row' as const, gap: 3 },
-  logoDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 1,
-    backgroundColor: colors.primary,
-  },
+  logoDot: { width: 6, height: 6, borderRadius: 1, backgroundColor: colors.primary },
   logoText: { ...TYPOGRAPHY.body, color: colors.text },
+  headerActions: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: SPACING.sm },
+  headerKeyButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
   getProButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.primary,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: 20,
+    borderRadius: 8,
   },
-  getProButtonText: { ...TYPOGRAPHY.bodySmall, color: '#FFFFFF' },
+  getProButtonText: { ...TYPOGRAPHY.bodySmall, color: colors.primary },
+  proActiveBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: SPACING.xs,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: 8,
+  },
+  proActiveBadgeText: { ...TYPOGRAPHY.bodySmall, color: colors.primary },
 
   // Hero
-  hero: {
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.xl,
-    alignItems: 'center' as const,
-  },
-  heroTitle: {
-    ...TYPOGRAPHY.h1,
-    color: colors.text,
-    textAlign: 'center' as const,
-    marginBottom: SPACING.xs,
-  },
-  heroPrimary: {
-    ...TYPOGRAPHY.h1,
-    color: colors.primary,
-    textAlign: 'center' as const,
-    marginBottom: SPACING.md,
-  },
+  hero: { paddingHorizontal: SPACING.xl, paddingVertical: SPACING.xl, alignItems: 'center' as const },
+  heroTitle: { ...TYPOGRAPHY.h1, color: colors.text, textAlign: 'center' as const },
+  heroPrimary: { ...TYPOGRAPHY.h1, color: colors.primary, textAlign: 'center' as const, marginBottom: SPACING.md },
   heroSubtitle: {
     ...TYPOGRAPHY.bodySmall,
     color: colors.textSecondary,
@@ -207,103 +255,39 @@ const createStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
     lineHeight: 20,
   },
 
-  // Promo Banner — fixed dark-green branded surface
-  promoBannerWrapper: {
-    alignSelf: 'stretch' as const,
+  // Pricing banner
+  pricingBanner: {
     marginHorizontal: SPACING.xl,
     marginBottom: SPACING.xl,
-    borderRadius: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
     paddingVertical: SPACING.lg,
     paddingHorizontal: SPACING.xl,
-    overflow: 'hidden' as const,
+    ...shadows.small,
   },
-  promoOfferRow: {
+  pricingLabelRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     gap: SPACING.xs,
     marginBottom: SPACING.sm,
   },
-  promoOfferLabel: {
-    ...TYPOGRAPHY.label,
-    color: colors.primary,
-    letterSpacing: 0.8,
-  },
-  promoTitle: {
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '600' as const,
-    letterSpacing: -0.5,
-    color: '#FFFFFF',
-    textAlign: 'center' as const,
-    marginBottom: SPACING.xs,
-  },
-  promoSubtitle: {
-    fontSize: 13,
-    fontWeight: '400' as const,
-    color: 'rgba(255,255,255,0.7)',
-    textAlign: 'center' as const,
-    lineHeight: 18,
-  },
+  pricingLabel: { ...TYPOGRAPHY.label, color: colors.primary, letterSpacing: 0.8 },
+  pricingTitle: { ...TYPOGRAPHY.display, color: colors.text, textAlign: 'center' as const, marginBottom: SPACING.xs },
+  pricingSubtitle: { ...TYPOGRAPHY.bodySmall, color: colors.textSecondary, textAlign: 'center' as const, lineHeight: 18 },
 
-  // Integrations grid
-  integrationsSection: {
-    paddingHorizontal: SPACING.xl,
-    marginBottom: SPACING.xl,
-  },
+  // Pillars
+  pillarsSection: { paddingHorizontal: SPACING.xl, marginBottom: SPACING.lg },
   sectionLabel: {
     ...TYPOGRAPHY.label,
     color: colors.textMuted,
     letterSpacing: 1,
-    textAlign: 'center' as const,
     marginBottom: SPACING.md,
   },
-  gridRow: {
-    flexDirection: 'row' as const,
-    gap: SPACING.md,
-    marginBottom: SPACING.md,
-  },
-  gridCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: SPACING.lg,
-    alignItems: 'center' as const,
-    ...shadows.small,
-  },
-  gridIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surfaceLight,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    marginBottom: SPACING.sm,
-  },
-  gridCardTitle: {
-    ...TYPOGRAPHY.body,
-    color: colors.text,
-    textAlign: 'center' as const,
-    marginBottom: SPACING.xs,
-  },
-  gridCardDesc: {
-    ...TYPOGRAPHY.bodySmall,
-    color: colors.textSecondary,
-    textAlign: 'center' as const,
-    lineHeight: 18,
-  },
-
-  // MCP Card
-  mcpCard: {
-    flexDirection: 'row' as const,
-    borderRadius: 12,
-    padding: SPACING.lg,
-    gap: SPACING.md,
-    alignItems: 'flex-start' as const,
-    overflow: 'hidden' as const,
-    ...shadows.small,
-  },
-  mcpIconWrap: {
+  pillarRow: { flexDirection: 'row' as const, gap: SPACING.md, paddingVertical: SPACING.md, alignItems: 'flex-start' as const },
+  pillarIconWrap: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -311,54 +295,38 @@ const createStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  mcpContent: {
-    flex: 1,
-  },
-  mcpTitleRow: {
+  pillarText: { flex: 1, gap: 3 as number },
+  pillarTitle: { ...TYPOGRAPHY.body, color: colors.text },
+  pillarDesc: { ...TYPOGRAPHY.bodySmall, color: colors.textSecondary, lineHeight: 18 },
+  julyNote: { ...TYPOGRAPHY.bodySmall, color: colors.textMuted, lineHeight: 18, marginTop: SPACING.md },
+
+  // CTAs (Button supplies its own colours/border; these are layout-only).
+  ctaButton: { marginHorizontal: SPACING.xl, marginTop: SPACING.sm, marginBottom: SPACING.md },
+  verifyButton: { marginHorizontal: SPACING.xl, marginBottom: SPACING.xl },
+
+  // Desktop companion link
+  desktopRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: SPACING.sm,
-    marginBottom: SPACING.xs,
-    flexWrap: 'wrap' as const,
-  },
-  mcpTitle: {
-    ...TYPOGRAPHY.body,
-    color: colors.text,
-  },
-  advancedBadge: {
-    borderRadius: 4,
-    paddingHorizontal: SPACING.xs + 2,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  advancedBadgeText: {
-    ...TYPOGRAPHY.labelSmall,
-    color: colors.primary,
-    letterSpacing: 0.5,
-  },
-  mcpDesc: {
-    ...TYPOGRAPHY.bodySmall,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-
-  // CTA
-  ctaButton: {
+    gap: SPACING.md,
     marginHorizontal: SPACING.xl,
-    marginBottom: SPACING.xl,
-    backgroundColor: colors.primary,
+    marginTop: SPACING.sm,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     borderRadius: 12,
-    paddingVertical: SPACING.lg,
-    flexDirection: 'row' as const,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  desktopIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surfaceLight,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    gap: SPACING.sm,
   },
-  ctaText: {
-    ...TYPOGRAPHY.body,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-
+  desktopText: { flex: 1, gap: 3 as number },
+  desktopTitle: { ...TYPOGRAPHY.body, color: colors.text },
+  desktopDesc: { ...TYPOGRAPHY.bodySmall, color: colors.textSecondary, lineHeight: 18 },
 });

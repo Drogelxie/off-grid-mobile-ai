@@ -49,6 +49,15 @@ if [ -n "$PUSHED_JS" ]; then
 
   echo "▶ JS/TS tests (related to changed files)..."
   echo "$PUSHED_JS" | tr '\n' '\0' | xargs -0 npx jest --findRelatedTests --passWithNoTests
+
+  echo "▶ Architecture gate (dependency-cruiser)..."
+  npm run depcruise
+
+  # knip runs in CI (the "architecture" job) as a hard 0-gate, but was NOT in this local hook, so
+  # unused-export failures only surfaced after a wasted CI round-trip (twice). Run it here too. It
+  # analyses the whole project (not just the push range), so keep it in the JS block.
+  echo "▶ Dead-code gate (knip)..."
+  npm run knip
 fi
 
 if [ -n "$PUSHED_SWIFT" ]; then

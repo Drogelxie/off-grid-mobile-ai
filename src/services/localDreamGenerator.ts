@@ -64,13 +64,13 @@ class LocalDreamGeneratorService {
     }
   }
 
-  async loadModel(modelPath: string, threads?: number, opts: { backend?: 'mnn' | 'qnn' | 'auto'; cpuOnly?: boolean; attentionVariant?: 'split_einsum' | 'original' } = {}): Promise<boolean> {
+  async loadModel(modelPath: string, threads?: number, opts: { backend?: 'mnn' | 'qnn' | 'auto'; cpuOnly?: boolean; attentionVariant?: 'split_einsum' | 'original'; preferGpu?: boolean } = {}): Promise<boolean> {
     if (!this.isAvailable()) {
       throw new Error('LocalDream image generation is not available on this platform');
     }
 
     const backend = opts.backend ?? 'auto';
-    const params: { modelPath: string; threads?: number; backend: string; cpuOnly?: boolean; attentionVariant?: string } = {
+    const params: { modelPath: string; threads?: number; backend: string; cpuOnly?: boolean; attentionVariant?: string; preferGpu?: boolean } = {
       modelPath,
       backend,
     };
@@ -82,6 +82,11 @@ class LocalDreamGeneratorService {
     }
     if (opts.attentionVariant) {
       params.attentionVariant = opts.attentionVariant;
+    }
+    // iOS Core ML only: select the compute path (GPU vs Neural Engine) the
+    // residency estimate was sized for, so the native load matches the budget.
+    if (typeof opts.preferGpu === 'boolean') {
+      params.preferGpu = opts.preferGpu;
     }
 
     const result = await DiffusionModule.loadModel(params);
@@ -110,6 +115,7 @@ class LocalDreamGeneratorService {
     return this.getEmitter().addListener(
       'LocalDreamProgress',
       (event: { step: number; totalSteps: number; progress: number; previewPath?: string }) => {
+        logger.log(`[WIRE-IMAGE-PROGRESS] ${JSON.stringify(event)}`); // [WIRE] raw LocalDreamProgress event shape
         onProgress?.({
           step: event.step,
           totalSteps: event.totalSteps,
@@ -123,7 +129,7 @@ class LocalDreamGeneratorService {
   }
 
   private buildNativeParams(params: ImageGenerationParams & { previewInterval?: number }, prompt: string) {
-    return {
+    const np = {
       prompt,
       negativePrompt: params.negativePrompt || '',
       steps: params.steps || 8,
@@ -134,9 +140,12 @@ class LocalDreamGeneratorService {
       previewInterval: params.previewInterval ?? 2,
       useOpenCL: params.useOpenCL ?? true,
     };
+    logger.log(`[WIRE-IMAGE-PARAMS] ${JSON.stringify({ requested: { steps: params.steps, guidanceScale: params.guidanceScale, width: params.width, height: params.height }, native: { ...np, prompt: undefined } })}`); // [WIRE] settings→native image params
+    return np;
   }
 
   private buildResult(params: ImageGenerationParams, result: any): GeneratedImage {
+    logger.log(`[WIRE-IMAGE] ${JSON.stringify(result)}`); // [WIRE] raw native generateImage result shape from-device
     return {
       id: result.id,
       prompt: params.prompt,
@@ -244,7 +253,9 @@ class LocalDreamGeneratorService {
         SUPPORTED_HEIGHTS: [128, 192, 256, 320, 384, 448, 512],
       };
     }
-    return DiffusionModule.getConstants();
+    const __c = DiffusionModule.getConstants();
+    logger.log(`[WIRE-IMAGE-CONSTANTS] ${JSON.stringify(__c)}`); // [WIRE] raw native diffusion constants (steps/guidance/supported sizes)
+    return __c;
   }
 }
 

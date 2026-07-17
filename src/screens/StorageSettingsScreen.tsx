@@ -17,6 +17,7 @@ import { useAppStore, useChatStore } from '../stores';
 import { useDownloadStore } from '../stores/downloadStore';
 import { hardwareService, modelManager } from '../services';
 import { OrphanedFilesSection } from './OrphanedFilesSection';
+import { imageBackendLabel } from '../utils/imageBackend';
 import { createStyles } from './StorageSettingsScreen.styles';
 
 export const StorageSettingsScreen: React.FC = () => {
@@ -178,11 +179,7 @@ export const StorageSettingsScreen: React.FC = () => {
                 <View style={styles.modelInfo}>
                   <Text style={styles.modelName} numberOfLines={1}>{model.name}</Text>
                   <Text style={styles.modelMeta}>
-                    {(() => {
-                      if (model.backend === 'coreml') return 'Core ML';
-                      if (model.backend === 'qnn') return 'Qualcomm NPU';
-                      return 'GPU';
-                    })()}
+                    {imageBackendLabel(model.backend, 'GPU')}
                     {model.style ? ` • ${model.style}` : ''}
                   </Text>
                 </View>

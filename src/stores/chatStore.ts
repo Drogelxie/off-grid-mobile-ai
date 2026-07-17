@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Message, Conversation, GenerationMeta } from '../types';
-import { stripControlTokens, stripStreamingControlTokens } from '../utils/messageContent';
+import { stripStreamingControlTokens, parseModelOutput } from '../utils/messageContent';
 import { generateId } from '../utils/generateId';
+import { callHook, HOOKS } from '../bootstrap/hookRegistry';
 
 function nextUpdatedAt(previousUpdatedAt?: string): string {
   const now = Date.now();
@@ -26,32 +27,24 @@ function updateMessageInConv(
   };
 }
 
-/** Locate a fixed-string thinking block and split content into reasoning + response. */
-function sliceThinkingBlock(
-  content: string,
-  openTag: string,
-  closeTag: string,
-): { reasoningContent: string | undefined; responseContent: string } | null {
-  const openIdx = content.toLowerCase().indexOf(openTag.toLowerCase());
-  if (openIdx === -1) return null;
-  const closeIdx = content.toLowerCase().indexOf(closeTag.toLowerCase(), openIdx + openTag.length);
-  if (closeIdx === -1) return null;
-  const thinkStart = openIdx + openTag.length;
-  return {
-    reasoningContent: content.slice(thinkStart, closeIdx).trim() || undefined,
-    responseContent: content.slice(closeIdx + closeTag.length),
-  };
-}
-
-/** Extract channel-based thinking from raw streaming content before control tokens are stripped. */
-function extractChannelThinking(rawContent: string): { reasoningContent: string | undefined; responseContent: string } {
-  // Gemma 4 format: <|channel>thought\n[thinking]<channel|>[response]
-  const gemma4 = sliceThinkingBlock(rawContent, '<|channel>thought\n', '<channel|>');
-  if (gemma4) return gemma4;
-  // Qwen channel format: <|channel|>analysis<|message|>[thinking]<|channel|>final<|message|>[response]
-  const qwen = sliceThinkingBlock(rawContent, '<|channel|>analysis<|message|>', '<|channel|>final<|message|>');
-  if (qwen) return qwen;
-  return { reasoningContent: undefined, responseContent: rawContent };
+/**
+ * The portion of the in-progress stream that is safe to SPEAK in voice mode —
+ * never the reasoning/thinking. Models that stream reasoning on a separate
+ * channel leave streamingMessage answer-only. Models that inline reasoning (e.g.
+ * Qwen3, whose chat template injects the opening <think> so only a closing
+ * </think> is emitted) are sliced at </think>; until that tag arrives we withhold
+ * (return '') while thinking is enabled, so the thought process is never spoken
+ * sentence-by-sentence. onStreamingEnd still speaks the final answer if nothing
+ * streamed.
+ */
+function speakableStreamingAnswer(streamingMessage: string, streamingReasoning: string): string {
+  if (streamingReasoning.length > 0) return streamingMessage; // reasoning came separately
+  const closeIdx = streamingMessage.toLowerCase().lastIndexOf('</think>');
+  if (closeIdx !== -1) return streamingMessage.slice(closeIdx + '</think>'.length);
+  // No close tag yet: inline reasoning may still be in progress. Withhold while
+  // thinking is enabled; otherwise the content is the answer and is safe to speak.
+  const { useAppStore } = require('./appStore');
+  return useAppStore.getState().settings?.thinkingEnabled ? '' : streamingMessage;
 }
 
 /** Derive conversation title from the first user message. */
@@ -83,9 +76,13 @@ interface ChatState {
   setActiveConversation: (conversationId: string | null) => void;
   getActiveConversation: () => Conversation | null;
   setConversationProject: (conversationId: string, projectId: string | null) => void;
+  /** Unfile every conversation filed under a project (used when the project is deleted,
+   *  so no chat is left pointing at a project that no longer exists). */
+  unfileConversationsForProject: (projectId: string) => void;
   addMessage: (conversationId: string, message: Omit<Message, 'id' | 'timestamp'>) => Message;
   updateMessageContent: (conversationId: string, messageId: string, content: string) => void;
   updateMessageThinking: (conversationId: string, messageId: string, isThinking: boolean) => void;
+  updateMessageAudio: (conversationId: string, messageId: string, audio: { audioPath?: string; waveformData?: number[]; audioDurationSeconds?: number; isGeneratingAudio?: boolean; isAudioModeMessage?: boolean }) => void;
   deleteMessage: (conversationId: string, messageId: string) => void;
   deleteMessagesAfter: (conversationId: string, messageId: string) => void;
   startStreaming: (conversationId: string) => void;
@@ -159,6 +156,16 @@ export const useChatStore = create<ChatState>()(
         }));
       },
 
+      unfileConversationsForProject: (projectId) => {
+        set((state) => ({
+          conversations: state.conversations.map((conv) =>
+            conv.projectId !== projectId
+              ? conv
+              : { ...conv, projectId: undefined, updatedAt: nextUpdatedAt(conv.updatedAt) }
+          ),
+        }));
+      },
+
       addMessage: (conversationId, messageData) => {
         const message: Message = {
           id: generateId(),
@@ -196,6 +203,10 @@ export const useChatStore = create<ChatState>()(
             updateMessageInConv(conv, messageId, (msg) => ({ ...msg, isThinking }))
           ),
         }));
+      },
+
+      updateMessageAudio: (conversationId, messageId, audio) => {
+        set((state) => ({ conversations: mapConversation(state.conversations, conversationId, (conv) => updateMessageInConv(conv, messageId, (msg) => ({ ...msg, ...audio }))) }));
       },
 
       deleteMessage: (conversationId, messageId) => {
@@ -242,6 +253,10 @@ export const useChatStore = create<ChatState>()(
           isStreaming: true,
           isThinking: false,
         }));
+        // Feed only the ANSWER to pro audio for real-time sentence-by-sentence
+        // TTS (never the reasoning) — no-op unless voice mode + engine ready;
+        // free builds register nothing.
+        callHook(HOOKS.audioOnStreamingToken, speakableStreamingAnswer(get().streamingMessage, get().streamingReasoningContent));
       },
 
       appendToStreamingReasoningContent: (token) => {
@@ -263,15 +278,14 @@ export const useChatStore = create<ChatState>()(
       finalizeStreamingMessage: (conversationId, generationTimeMs, generationMeta) => {
         const { streamingMessage, streamingReasoningContent, streamingForConversationId, addMessage } = get();
 
-        let reasoningContent = streamingReasoningContent.trim() || undefined;
-        let rawContent = streamingMessage;
-        if (!reasoningContent) {
-          const extracted = extractChannelThinking(rawContent);
-          reasoningContent = extracted.reasoningContent;
-          rawContent = extracted.responseContent;
-        }
-
-        const sanitizedMessage = stripControlTokens(rawContent).trim();
+        // Parse ONCE at this boundary through the single shared parser (SoC §A / DR1):
+        // split the raw stream into reasoning + a clean answer. The answer is stripped of
+        // control and tool-call markup BY CONSTRUCTION, so no raw markup can reach the
+        // stored message — and no renderer downstream re-parses message.content.
+        const streamReasoning = streamingReasoningContent.trim() || undefined;
+        const parsed = parseModelOutput(streamingMessage, streamReasoning);
+        const reasoningContent = parsed.reasoning ?? undefined;
+        const sanitizedMessage = parsed.answer;
         if (streamingForConversationId === conversationId && (sanitizedMessage || reasoningContent)) {
           addMessage(conversationId, {
             role: 'assistant',

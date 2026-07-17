@@ -13,7 +13,33 @@ try {
   // Built-in matchers in v12.4+, or no matchers needed for basic tests
 }
 
+// Raise RNTL's async-util timeout (waitFor/findBy) from the 1s default to 5s. Under heavy
+// parallelism (the pre-push --findRelatedTests run fans hundreds of Message-importing
+// suites across all workers), the 1s default starves — a genuinely-passing waitFor poll
+// doesn't get scheduled in time and flakes. 5s is load-tolerant yet well under the 10s
+// jest testTimeout, so passing tests stay fast and only starved ones get grace. Removes a
+// whole class of load-dependent flakiness without changing any assertion.
+try {
+  require('@testing-library/react-native').configure({ asyncUtilTimeout: 5000 });
+} catch {
+  // RNTL not present in a given suite's module graph — nothing to configure.
+}
+
 const shouldPrintJestConsole = process.env.DEBUG_JEST_CONSOLE === '1';
+
+// react-native-keyboard-controller ships a jest mock; without it, any test that
+// renders App or ChatScreen pulls in its native module and crashes.
+jest.mock('react-native-keyboard-controller', () =>
+  require('react-native-keyboard-controller/jest'),
+);
+
+// react-native-edge-to-edge drives the system bars natively; stub its components
+// so tests rendering App don't reach the native module.
+jest.mock('react-native-edge-to-edge', () => ({
+  SystemBars: () => null,
+  StatusBar: () => null,
+  NavigationBar: () => null,
+}));
 
 // ============================================================================
 // AsyncStorage Mock
@@ -149,6 +175,136 @@ jest.mock('whisper.rn', () => ({
   },
 }), { virtual: true });
 
+// RN host-component native-measurement boundary. The RN jest preset stubs measure/measureInWindow as
+// no-op jest.fns that never invoke their callback, so any component that anchors UI off a measured node
+// (e.g. a dropdown whose open() runs INSIDE the measureInWindow callback) stalls in tests. Faithfully
+// invoke the layout callback (x, y, width, height[, pageX, pageY]) so that real UI proceeds — the only
+// non-faithful part of the preset's host mock for our flows.
+jest.mock('react-native/jest/mockNativeComponent', () => {
+  const ReactLocal = require('react');
+  let tag = 1;
+  return (viewName: string) => {
+    const Component = class extends ReactLocal.Component {
+      _nativeTag = tag++;
+      render() {
+        const self = this as unknown as { props: Record<string, unknown> & { children?: unknown } };
+        return ReactLocal.createElement(viewName, self.props, self.props.children);
+      }
+      blur = jest.fn();
+      focus = jest.fn();
+      measure = (cb?: (...a: number[]) => void) => cb?.(0, 0, 100, 40, 0, 0);
+      measureInWindow = (cb?: (...a: number[]) => void) => cb?.(0, 0, 100, 40);
+      measureLayout = jest.fn();
+      setNativeProps = jest.fn();
+    };
+    (Component as { displayName?: string }).displayName = viewName === 'RCTView' ? 'View' : viewName;
+    return Component;
+  };
+});
+
+// react-native-audio-api mock
+jest.mock('react-native-audio-api', () => ({
+  AudioContext: jest.fn().mockImplementation(() => ({
+    createBuffer: jest.fn().mockReturnValue({ copyToChannel: jest.fn() }),
+    createBufferSource: jest.fn().mockReturnValue({
+      connect: jest.fn(),
+      start: jest.fn(),
+      stop: jest.fn(),
+      playbackRate: { value: 1.0 },
+      onEnded: null,
+      buffer: null,
+    }),
+    destination: {},
+    state: 'suspended',
+    resume: jest.fn().mockResolvedValue(undefined),
+    suspend: jest.fn().mockResolvedValue(undefined),
+    close: jest.fn().mockResolvedValue(undefined),
+  })),
+  AudioManager: {
+    setAudioSessionOptions: jest.fn(),
+    setAudioSessionActivity: jest.fn().mockResolvedValue(true),
+  },
+  AudioRecorder: jest.fn().mockImplementation(() => ({
+    enableFileOutput: jest.fn().mockReturnValue({ status: 'success', path: '/mock/audio/input.wav' }),
+    start: jest.fn().mockReturnValue({ status: 'success', path: '/mock/audio/input.wav' }),
+    stop: jest.fn().mockReturnValue({ status: 'success', path: '/mock/audio/input.wav', size: 1024, duration: 1.0 }),
+    pause: jest.fn(),
+    resume: jest.fn(),
+    isRecording: jest.fn().mockReturnValue(false),
+    isPaused: jest.fn().mockReturnValue(false),
+  })),
+  FileFormat: { Wav: 0, Caf: 1, M4A: 2, Flac: 3 },
+  FileDirectory: { Document: 0, Cache: 1 },
+  BitDepth: { Bit8: 0, Bit16: 1, Bit24: 2, Bit32: 3 },
+  IOSAudioQuality: { Min: 0, Low: 1, Medium: 2, High: 3, Max: 4 },
+  FlacCompressionLevel: { L0: 0, L5: 5, L8: 8 },
+}), { virtual: true });
+
+// @react-native-community/slider mock
+jest.mock('@react-native-community/slider', () => {
+  const { View } = require('react-native');
+  return { __esModule: true, default: View };
+});
+
+// react-native-executorch mock
+// A voice carries its own assets (embedding + tagger + lexicon) in addition to
+// the two shared core .pte models — mirror that so completeness checks
+// (_activeVoiceSources) have a realistic full asset set to validate against.
+const mockVoiceConfig = {
+  id: 'mock_voice',
+  voiceSource: 'https://example.test/kokoro/voices/af_heart.bin',
+  extra: {
+    taggerSource: 'https://example.test/kokoro/tagger.pt',
+    lexiconSource: 'https://example.test/kokoro/lexicon.json',
+  },
+};
+jest.mock('react-native-executorch', () => ({
+  // Faithful init leaf for the executorch native runtime (a genuine external native boundary):
+  // initExecutorch registers the resource fetcher so the runtime is ready to load models through
+  // it. With models faked at the fetcher + useTextToSpeech boundary there is nothing further to
+  // emulate in-process, so it is a ready-signal (EngineBridge calls it at module import — without
+  // this the pro TTS bootstrap throws "initExecutorch is not a function").
+  initExecutorch: () => {},
+  // useTextToSpeech is the executorch boundary the TTS bridge drives. The streaming/playback is
+  // exercised end-to-end by the KokoroTTSBridge suite, which feeds chunks + drives onEnded through
+  // the AudioContext itself; here stream() just resolves (the bridge owns the audio pump).
+  useTextToSpeech: jest.fn(() => ({
+    isReady: true,
+    downloadProgress: 1,
+    error: null,
+    stream: jest.fn(() => Promise.resolve()),
+    streamStop: jest.fn(),
+  })),
+  KOKORO_MEDIUM: {
+    modelName: 'kokoro-medium',
+    durationPredictorSource: 'https://example.test/kokoro/medium/duration_predictor.pte',
+    synthesizerSource: 'https://example.test/kokoro/medium/synthesizer.pte',
+  },
+  KOKORO_VOICE_AF_HEART: mockVoiceConfig,
+  KOKORO_VOICE_AF_RIVER: mockVoiceConfig,
+  KOKORO_VOICE_AF_SARAH: mockVoiceConfig,
+  KOKORO_VOICE_AM_ADAM: mockVoiceConfig,
+  KOKORO_VOICE_AM_MICHAEL: mockVoiceConfig,
+  KOKORO_VOICE_AM_SANTA: mockVoiceConfig,
+  KOKORO_VOICE_BF_EMMA: mockVoiceConfig,
+  KOKORO_VOICE_BM_DANIEL: mockVoiceConfig,
+}));
+
+// react-native-executorch-bare-resource-fetcher mock.
+// Default: nothing on disk. Tests override listDownloadedModels per case.
+jest.mock(
+  'react-native-executorch-bare-resource-fetcher',
+  () => ({
+    BareResourceFetcher: {
+      listDownloadedModels: jest.fn(async () => [] as string[]),
+      listDownloadedFiles: jest.fn(async () => [] as string[]),
+      deleteResources: jest.fn(async () => {}),
+      fetch: jest.fn(async () => {}),
+    },
+  }),
+  { virtual: true },
+);
+
 // react-native-fs mock
 jest.mock('react-native-fs', () => ({
   DocumentDirectoryPath: '/mock/documents',
@@ -216,6 +372,7 @@ jest.mock('react-native-keychain', () => ({
   resetGenericPassword: jest.fn(() => Promise.resolve(true)),
 }));
 
+
 // @react-native-voice/voice mock
 jest.mock('@react-native-voice/voice', () => ({
   start: jest.fn(() => Promise.resolve()),
@@ -257,9 +414,20 @@ jest.mock('@react-native-documents/viewer', () => ({
   },
 }));
 
+// A Swipeable whose swipe-revealed right actions (delete buttons etc.) are RENDERED, so those gestures are
+// reachable in tests (jest can't simulate the drag, but the actions a swipe reveals become tappable). Used
+// for both the barrel export and the direct import below.
+const makeMockSwipeable = () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return ({ children, renderRightActions, renderLeftActions }: { children?: unknown; renderRightActions?: () => unknown; renderLeftActions?: () => unknown }) =>
+    React.createElement(View, {}, children as never, renderRightActions ? (renderRightActions() as never) : null, renderLeftActions ? (renderLeftActions() as never) : null);
+};
+
 // react-native-gesture-handler mock
 jest.mock('react-native-gesture-handler', () => {
   const MockView = 'View';
+  const MockSwipeable = makeMockSwipeable();
   const mockGestureBuilder = () => {
     const gesture: any = {
       activeOffsetX: () => gesture,
@@ -272,7 +440,7 @@ jest.mock('react-native-gesture-handler', () => {
     return gesture;
   };
   return {
-    Swipeable: MockView,
+    Swipeable: MockSwipeable,
     GestureHandlerRootView: MockView,
     GestureDetector: MockView,
     ScrollView: MockView,
@@ -292,7 +460,7 @@ jest.mock('react-native-gesture-handler', () => {
 });
 
 // Mock the direct import of Swipeable
-jest.mock('react-native-gesture-handler/Swipeable', () => 'View');
+jest.mock('react-native-gesture-handler/Swipeable', () => makeMockSwipeable());
 
 // react-native-worklets mock — must come before reanimated
 jest.mock('react-native-worklets', () => ({}));
@@ -343,24 +511,9 @@ jest.mock('react-native-haptic-feedback', () => ({
   trigger: jest.fn(),
 }));
 
-// @react-native-community/blur mock
-jest.mock('@react-native-community/blur', () => ({
-  BlurView: 'BlurView',
-}));
 
-// lottie-react-native mock
-jest.mock('lottie-react-native', () => 'LottieView');
 
-// react-native-linear-gradient mock
-jest.mock('react-native-linear-gradient', () => 'LinearGradient');
 
-// moti mock (kept for any transitive imports)
-jest.mock('moti', () => ({
-  MotiView: 'MotiView',
-  MotiText: 'MotiText',
-  MotiImage: 'MotiImage',
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
-}), { virtual: true });
 
 // @op-engineering/op-sqlite mock
 jest.mock('@op-engineering/op-sqlite', () => {
@@ -448,15 +601,25 @@ jest.mock('react-native-spotlight-tour', () => ({
   }),
 }));
 
-// react-native-safe-area-context mock
-jest.mock('react-native-safe-area-context', () => {
-  const defaultInset = { top: 0, right: 0, bottom: 0, left: 0 };
-  return {
-    SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
-    SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
-    useSafeAreaInsets: jest.fn(() => defaultInset),
+// react-native-screens mock — the native Screen/ScreenStack components are undefined in jest, which
+// crashes @react-navigation/native-stack ($$typeof undefined). Map them to plain Views so a REAL
+// NavigationContainer + navigator mounts and real cross-screen navigation can be driven in tests.
+jest.mock('react-native-screens', () => {
+  const RN = require('react-native');
+  const noop = () => {};
+  const base: Record<string, unknown> = {
+    enableScreens: noop, enableFreeze: noop, screensEnabled: () => false,
+    Screen: RN.View, ScreenContainer: RN.View, ScreenStack: RN.View, ScreenStackHeaderConfig: RN.View,
+    NativeScreen: RN.View, NativeScreenContainer: RN.View, FullWindowOverlay: RN.View,
   };
+  return new Proxy(base, { get: (t, p) => (p in t ? t[p as string] : RN.View) });
 });
+
+// react-native-safe-area-context mock — use the library's SHIPPED jest mock, which exports the full
+// surface (SafeAreaInsetsContext / SafeAreaFrameContext / initialWindowMetrics) that @react-navigation's
+// SafeAreaProviderCompat reads. The old hand-rolled mock omitted the contexts, so a real
+// NavigationContainer could not mount (useContext(undefined)).
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 // ============================================================================
 // Global Test Utilities
@@ -519,6 +682,20 @@ if (!shouldPrintJestConsole) {
 beforeEach(() => {
   jest.clearAllMocks();
   clearMockStorage();
+});
+
+// Global test isolation for the native-boundary harness. Tests that call installNativeBoundary()
+// jest.resetModules() mid-test, which forks React Testing Library so its OWN auto-cleanup can't register
+// (requireRTL deliberately skips it to avoid the "hook after tests started" error). Without cleanup,
+// mounted screens persist and their store/residency writes BLEED into the next test (order-dependent
+// flakiness, far worse in-band). This afterEach requires RTL AFTER the test's resetModules, so it resolves
+// the SAME post-reset instance the test rendered on, and unmounts its tree. It also drops the global
+// `window` shim the harness installs for React 19's error reporter, so no true-global leaks across files.
+afterEach(() => {
+  // Only unmount when a test actually rendered via requireRTL (which stashed its own cleanup here). Do NOT
+  // require RTL fresh — after a test's resetModules that pulls a new module graph and breaks the next test.
+  const g = globalThis as unknown as { __RTL_CLEANUP__?: () => void };
+  if (g.__RTL_CLEANUP__) { try { g.__RTL_CLEANUP__(); } catch { /* already torn down */ } g.__RTL_CLEANUP__ = undefined; }
 });
 
 // Global timeout for async operations

@@ -33,6 +33,16 @@ export const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  // Audio (voice) mode: a larger, clearly-circular bordered mic so it reads as
+  // the primary "press to speak" action.
+  buttonAudio: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
   buttonAsSendUnavailable: {
     width: 44,
     height: 44,
@@ -49,6 +59,42 @@ export const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     backgroundColor: colors.surface,
     borderWidth: 2,
     borderColor: colors.primary,
+    borderTopColor: 'transparent',
+  },
+  // Background STT download (send-slot footprint): a STATIC determinate ring —
+  // per-quadrant border colors are set from ringQuadrants at render. Matches the
+  // 44px send-slot size; visually distinct from the rotating loading ring.
+  buttonAsSendDownloading: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+  },
+  // Background STT download at the default 36px mic footprint (non-send variants).
+  buttonDownloadRing: {
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+  },
+  // Audio (voice) mode loading/transcribing: a 56px spinner ring that matches the
+  // buttonAudio mic footprint EXACTLY, so the center slot keeps one size across
+  // mic / loading / transcribing / stop — the bottom bar never grows or shrinks.
+  buttonAudioLoading: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderTopColor: 'transparent',
+  },
+  buttonAudioTranscribing: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.info,
     borderTopColor: 'transparent',
   },
   buttonRecording: {
@@ -84,11 +130,6 @@ export const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.primary,
-  },
-  loadingText: {
-    fontSize: 11,
-    color: colors.primary,
-    marginLeft: 6,
   },
   transcribingText: {
     fontSize: 11,
@@ -126,19 +167,6 @@ export const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     height: 2,
     backgroundColor: colors.textMuted,
     transform: [{ rotate: '-45deg' }],
-  },
-  cancelHint: {
-    position: 'absolute' as const,
-    left: -100,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: `${colors.primary}40`,
-    borderRadius: 12,
-  },
-  cancelHintText: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '500' as const,
   },
   partialResultContainer: {
     position: 'absolute' as const,

@@ -1,14 +1,25 @@
-export { MODEL_RECOMMENDATIONS, RECOMMENDED_MODELS, TRENDING_FAMILIES, TRENDING_MODEL_IDS, MODEL_ORGS, QUANTIZATION_INFO } from './models';
+export {
+  MODEL_RECOMMENDATIONS,
+  RECOMMENDED_MODELS,
+  TRENDING_FAMILIES,
+  TRENDING_MODEL_IDS,
+  MODEL_ORGS,
+  QUANTIZATION_INFO,
+} from './models';
 export { GRADIENTS } from '../theme/palettes';
 
 // External URLs
-export const WEDNESDAY_URL = 'https://mobile.wednesday.is/hire-ai-native-mobile-squad?utm_source=off-grid-mobile-app&utm_medium=made-with-love&utm_campaign=in-app';
+export const WEDNESDAY_URL = 'https://wednesday.is';
+
+// Off Grid AI Desktop: the free, open-source desktop app (not a Pro feature).
+// Linked from Pro screens and from remote-server discovery alike.
+export const OFF_GRID_DESKTOP_URL = 'https://getoffgridai.co/desktop';
 
 export const PRO_AHA_FEATURES = [
-  'Voice-native conversation',
-  'Custom MCP servers',
-  'Calendar and WhatsApp integration',
-  'More, shipping monthly',
+  'Ambient across your devices',
+  'Proactive, not reactive',
+  'Private by architecture',
+  'It acts, you approve',
 ];
 
 // Hugging Face API configuration
@@ -26,46 +37,43 @@ export const HF_API = {
 
 // Model credibility configuration
 // LM Studio community - highest credibility for GGUF models
-export const LMSTUDIO_AUTHORS = [
-  'lmstudio-community',
-  'lmstudio-ai',
-];
+export const LMSTUDIO_AUTHORS = ['lmstudio-community', 'lmstudio-ai'];
 
 // Official model creators - these are the original model authors
 export const OFFICIAL_MODEL_AUTHORS: Record<string, string> = {
   'meta-llama': 'Meta',
-  'microsoft': 'Microsoft',
-  'google': 'Google',
-  'Qwen': 'Alibaba',
-  'mistralai': 'Mistral AI',
-  'HuggingFaceTB': 'Hugging Face',
-  'HuggingFaceH4': 'Hugging Face',
-  'bigscience': 'BigScience',
-  'EleutherAI': 'EleutherAI',
-  'tiiuae': 'TII UAE',
-  'stabilityai': 'Stability AI',
-  'databricks': 'Databricks',
-  'THUDM': 'Tsinghua University',
+  microsoft: 'Microsoft',
+  google: 'Google',
+  Qwen: 'Alibaba',
+  mistralai: 'Mistral AI',
+  HuggingFaceTB: 'Hugging Face',
+  HuggingFaceH4: 'Hugging Face',
+  bigscience: 'BigScience',
+  EleutherAI: 'EleutherAI',
+  tiiuae: 'TII UAE',
+  stabilityai: 'Stability AI',
+  databricks: 'Databricks',
+  THUDM: 'Tsinghua University',
   'baichuan-inc': 'Baichuan',
-  'internlm': 'InternLM',
+  internlm: 'InternLM',
   '01-ai': '01.AI',
   'deepseek-ai': 'DeepSeek',
-  'CohereForAI': 'Cohere',
-  'allenai': 'Allen AI',
-  'nvidia': 'NVIDIA',
-  'apple': 'Apple',
+  CohereForAI: 'Cohere',
+  allenai: 'Allen AI',
+  nvidia: 'NVIDIA',
+  apple: 'Apple',
 };
 
 // Verified quantizers - trusted community members who quantize models
 export const VERIFIED_QUANTIZERS: Record<string, string> = {
-  'TheBloke': 'TheBloke',
-  'bartowski': 'bartowski',
-  'QuantFactory': 'QuantFactory',
-  'mradermacher': 'mradermacher',
+  TheBloke: 'TheBloke',
+  bartowski: 'bartowski',
+  QuantFactory: 'QuantFactory',
+  mradermacher: 'mradermacher',
   'second-state': 'Second State',
-  'MaziyarPanahi': 'Maziyar Panahi',
-  'Triangle104': 'Triangle104',
-  'unsloth': 'Unsloth',
+  MaziyarPanahi: 'Maziyar Panahi',
+  Triangle104: 'Triangle104',
+  unsloth: 'Unsloth',
   'ggml-org': 'GGML (HuggingFace)',
 };
 
@@ -115,25 +123,29 @@ export const ONBOARDING_SLIDES = [
     id: 'freedom',
     keyword: 'YOURS',
     title: 'Your AI.\nNo Strings Attached.',
-    description: 'No subscriptions, no sign-ups, no company reading your chats. An AI that lives on your device and answers to no one else.',
+    description:
+      'No subscriptions, no sign-ups, no company reading your chats. An AI that lives on your device and answers to no one else.',
   },
   {
     id: 'magic',
     keyword: 'MAGIC',
     title: 'Just Talk.\nIt Figures Out the Rest.',
-    description: 'Describe an image \u2014 it creates one. Show it a photo \u2014 it understands. Attach a document \u2014 it reads it. One conversation, no modes, no friction.',
+    description:
+      'Describe an image \u2014 it creates one. Show it a photo \u2014 it understands. Attach a document \u2014 it reads it. One conversation, no modes, no friction.',
   },
   {
     id: 'create',
     keyword: 'CREATE',
     title: 'Say It Simply.\nGet Something Stunning.',
-    description: 'Type \u201Cimagine a cat on the moon\u201D and watch your words become a vivid image in seconds. AI enhances your ideas automatically \u2014 no prompt engineering needed.',
+    description:
+      'Type \u201Cimagine a cat on the moon\u201D and watch your words become a vivid image in seconds. AI enhances your ideas automatically \u2014 no prompt engineering needed.',
   },
   {
     id: 'hardware',
     keyword: 'READY',
     title: 'Powered\nYour Way.',
-    description: 'Run models on your phone with Metal and Neural Engine acceleration \u2014 or connect to powerful models already on your home network. We\u2019ll find the best setup for you.',
+    description:
+      'Run models on your phone with Metal and Neural Engine acceleration \u2014 or connect to powerful models already on your home network. We\u2019ll find the best setup for you.',
   },
 ];
 
@@ -221,4 +233,3 @@ export const SPACING = {
   xl: 24,
   xxl: 32,
 };
-

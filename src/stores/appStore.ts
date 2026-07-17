@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DeviceInfo, DownloadedModel, ModelRecommendation, ONNXImageModel, ImageGenerationMode, AutoDetectMethod, ModelLoadingStrategy, CacheType, InferenceBackend, INFERENCE_BACKENDS, LiteRTBackend, GeneratedImage } from '../types';
+import { DeviceInfo, DownloadedModel, ModelRecommendation, ONNXImageModel, ImageGenerationMode, AutoDetectMethod, CacheType, InferenceBackend, INFERENCE_BACKENDS, LiteRTBackend, GeneratedImage } from '../types';
 import type { LanguageCode } from '../i18n';
 
 function isUnknownLike(value: string): boolean {
@@ -24,6 +24,23 @@ function isSuspiciousRecoveredImageModel(model: ONNXImageModel): boolean {
   return model.id.startsWith('recovered_');
 }
 
+// Whisper STT models are managed by whisperService (modelId 'whisper-<id>',
+// file 'ggml-<id>.bin') and belong to the Voice/Speech surfaces. They were being
+// recovered into the text model store, so they appeared under Text in the model
+// selector and as text-icon entries in the Download Manager. Exclude them here so
+// the single downloadedModels source never carries them — which also clears the
+// phantom entries already persisted on devices on the next setDownloadedModels.
+function isWhisperTextModel(model: DownloadedModel): boolean {
+  return (
+    model.id.startsWith('whisper-') ||
+    (model.fileName?.startsWith('ggml-') === true && model.fileName.endsWith('.bin'))
+  );
+}
+
+function isExcludedTextModel(model: DownloadedModel): boolean {
+  return isSuspiciousRecoveredTextModel(model) || isWhisperTextModel(model);
+}
+
 type OnboardingChecklist = {
   downloadedModel: boolean; loadedModel: boolean; sentMessage: boolean;
   triedImageGen: boolean; exploredSettings: boolean; createdProject: boolean;
@@ -36,11 +53,26 @@ type AppSettings = {
   imageGenerationMode: ImageGenerationMode; autoDetectMethod: AutoDetectMethod;
   classifierModelId: string | null; imageSteps: number; imageGuidanceScale: number;
   imageThreads: number; imageWidth: number; imageHeight: number;
-  imageUseOpenCL: boolean; enhanceImagePrompts: boolean; modelLoadingStrategy: ModelLoadingStrategy;
+  imageUseOpenCL: boolean; enhanceImagePrompts: boolean;
   enableGpu: boolean; gpuLayers: number; flashAttn: boolean;
+  /** Aggressive model loading: commit more RAM + a smaller reserve so large models
+   *  load (with a "Load Anyway" override when the budget still blocks). Off by
+   *  default (behaviour-neutral). Single source of truth read by both the Settings
+   *  screen and the in-chat settings; projected onto the residency manager. */
+  aggressiveModelLoading: boolean;
+  /** How the residency manager handles multiple models (single source of truth read
+   *  by both settings surfaces, projected onto the manager via loadPolicySync):
+   *  'conservative' = one model at a time; 'balanced' = co-reside within budget;
+   *  'aggressive' = co-reside with a larger RAM commitment. */
+  modelLoadingMode?: 'conservative' | 'balanced' | 'aggressive';
   cacheType: CacheType; showGenerationDetails: boolean; enabledTools: string[];
   thinkingEnabled: boolean;
   inferenceBackend: InferenceBackend;
+  /** True once the user has explicitly picked an inference backend in Settings.
+   *  While false, the boot-time backendSync may upgrade the default to the GPU
+   *  path when the device supports it; once true, that auto-selection never
+   *  overrides the user's choice. Defaults to false (the current default was
+   *  auto-selected). */
   liteRTBackend: LiteRTBackend;
   liteRTTemperature: number;
   liteRTTopP: number;
@@ -71,6 +103,24 @@ interface AppState {
   removeDownloadedModel: (modelId: string) => void;
   activeModelId: string | null;
   setActiveModelId: (modelId: string | null) => void;
+  /** The text model that is ACTUALLY loaded in native memory right now (engine-agnostic — llama OR litert),
+   *  as opposed to activeModelId (the SELECTED model, which may be selected-but-not-yet-loaded or evicted).
+   *  A reactive projection of ActiveModelService's authoritative loaded state — the SINGLE source every
+   *  surface reads for "currently loaded", so the model sheet and the overview can't disagree (device
+   *  2026-07-14: sheet read llmService.getLoadedModelPath() — llama-only + stale — while the overview read
+   *  activeModelId). Not persisted (a relaunch has nothing loaded). */
+  loadedTextModelId: string | null;
+  setLoadedTextModelId: (modelId: string | null) => void;
+  /** The active text model was EVICTED to free RAM (e.g. an image/TTS load in voice mode)
+   *  while still selected. Drives the chat "tap to continue" reload affordance so a big
+   *  model that got unloaded can be brought back on demand. Set by the service, cleared
+   *  when a text model loads. Not persisted (a relaunch has nothing loaded to evict). */
+  textModelEvicted: boolean;
+  setTextModelEvicted: (evicted: boolean) => void;
+  /** Last text model the user explicitly selected. Persists across residency
+   *  eviction so routing can reload it on demand. */
+  lastTextModelId: string | null;
+  setLastTextModelId: (modelId: string | null) => void;
   isLoadingModel: boolean;
   setIsLoadingModel: (loading: boolean) => void;
   modelMaxContext: number | null;
@@ -100,6 +150,12 @@ interface AppState {
   shownSpotlights: Record<string, boolean>;
   markSpotlightShown: (key: string) => void;
   resetShownSpotlights: () => void;
+  /** Image models that have completed at least one generation. The FIRST run for a
+   *  model compiles/warms the backend (OpenCL kernels on Android, the CoreML model
+   *  on iOS) and takes ~120s — this drives the one-time warm-up notice on BOTH
+   *  platforms, persisted so it only shows once per model. */
+  warmedImageModels: string[];
+  markImageModelWarmed: (modelId: string) => void;
   textGenerationCount: number;
   imageGenerationCount: number;
   incrementTextGenerationCount: () => number;
@@ -109,8 +165,24 @@ interface AppState {
   // PRO pre-order state
   hasRegisteredPro: boolean;
   setHasRegisteredPro: (v: boolean) => void;
+  /**
+   * Authoritative "Pro is unlocked right now" — the same signal loadProFeatures uses
+   * to activate paid features (keychain entitlement OR a __DEV__ unlock), set at boot.
+   * This is the ONE flag every upsell gate must read: hasRegisteredPro alone misses a
+   * keychain/dev-unlocked Pro user, so the upsell wrongly fired for them. Not persisted
+   * — recomputed authoritatively each launch.
+   */
+  isProActive: boolean;
+  setProActive: (v: boolean) => void;
+  /** DEV-only: when true, suppresses the __DEV__ Pro auto-unlock so the
+   *  free → Pro activation flow can be exercised in a debug build. No effect in
+   *  release (__DEV__ is false there). */
+  devProDisabled: boolean;
+  setDevProDisabled: (v: boolean) => void;
   proBannerDismissed: boolean;
   setProBannerDismissed: (v: boolean) => void;
+  desktopPromoDismissed: boolean;
+  setDesktopPromoDismissed: (v: boolean) => void;
   proAhaTriggeredBy: 'image' | 'text' | null;
   setProAhaTriggeredBy: (by: 'image' | 'text' | null) => void;
   toolCountHintDismissed: boolean;
@@ -143,11 +215,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   imageHeight: 512,
   imageUseOpenCL: true,
   enhanceImagePrompts: false,
-  modelLoadingStrategy: 'performance' as ModelLoadingStrategy,
   enableGpu: Platform.OS === 'ios',
   inferenceBackend: Platform.OS === 'ios' ? INFERENCE_BACKENDS.METAL : INFERENCE_BACKENDS.CPU,
   gpuLayers: 99,
   flashAttn: true,
+  aggressiveModelLoading: false,
+  modelLoadingMode: 'balanced',
   cacheType: 'q8_0' as CacheType,
   showGenerationDetails: false,
   enabledTools: ['web_search', 'read_url', 'search_knowledge_base'],
@@ -161,6 +234,30 @@ const DEFAULT_SETTINGS: AppSettings = {
 function migrateEnabledTools(merged: any): void {
   if (merged.settings?.enabledTools && !merged.settings.enabledTools.includes('search_knowledge_base')) {
     merged.settings = { ...merged.settings, enabledTools: [...merged.settings.enabledTools, 'search_knowledge_base'] };
+  }
+}
+
+// The removed MCP context auto-boost pinned context to 32768 (and maxTokens to 8192 /
+// liteRTMaxTokens to 32768) on MCP enable and never restored it, causing OOM crashes
+// and tanked tok/s on flagship devices. Reset anyone left at the boost ceiling back to
+// the device-safe defaults. Idempotent: once reset, the values no longer match.
+const MCP_BOOST_CTX_CEILING = 32768;
+const MCP_BOOST_MAX_OUTPUT_TOKENS = 8192;
+function migrateBoostedContext(merged: any): void {
+  const s = merged.settings;
+  if (!s) return;
+  // Match the EXACT values the boost wrote, not `>=`. The boost set these to
+  // precise constants; a `>=` test also clobbers a user who legitimately chose a
+  // large context/maxTokens above the default, which this one-time migration must
+  // not touch.
+  if (s.contextLength === MCP_BOOST_CTX_CEILING) {
+    s.contextLength = DEFAULT_SETTINGS.contextLength;
+    // maxTokens was raised alongside contextLength by the boost; only reset it when the
+    // boost's exact value is present, so a legitimately-large user maxTokens isn't clobbered.
+    if (s.maxTokens === MCP_BOOST_MAX_OUTPUT_TOKENS) s.maxTokens = DEFAULT_SETTINGS.maxTokens;
+  }
+  if (s.liteRTMaxTokens === MCP_BOOST_CTX_CEILING) {
+    s.liteRTMaxTokens = DEFAULT_SETTINGS.liteRTMaxTokens;
   }
 }
 function migratePersistedState(persistedState: any, currentState: AppState): AppState {
@@ -177,8 +274,9 @@ function migratePersistedState(persistedState: any, currentState: AppState): App
   delete merged.imageModelDownloading;
   delete merged.imageModelDownloadIds;
   delete merged.imageModelDownloadId;
-  if (persistedState?.settings?.modelLoadingStrategy === 'memory') {
-    merged.settings = { ...merged.settings, modelLoadingStrategy: 'performance' };
+  // modelLoadingStrategy was removed (the residency manager owns swapping now).
+  if (merged.settings?.modelLoadingStrategy !== undefined) {
+    delete merged.settings.modelLoadingStrategy;
   }
   if (persistedState?.settings && !persistedState.settings.cacheType) {
     merged.settings = { ...merged.settings, cacheType: persistedState.settings.flashAttn ? 'q8_0' : 'f16', flashAttn: true };
@@ -193,6 +291,7 @@ function migratePersistedState(persistedState: any, currentState: AppState): App
   if (merged.checklistDismissed && merged.onboardingChecklist &&
     !Object.values(merged.onboardingChecklist).every(Boolean)) merged.checklistDismissed = false;
   migrateEnabledTools(merged);
+  migrateBoostedContext(merged);
   return merged as AppState;
 }
 
@@ -220,10 +319,10 @@ export const useAppStore = create<AppState>()(
       setDeviceInfo: (info) => set({ deviceInfo: info }),
       setModelRecommendation: (rec) => set({ modelRecommendation: rec }),
       downloadedModels: [],
-      setDownloadedModels: (models) => set({ downloadedModels: models.filter(m => !isSuspiciousRecoveredTextModel(m)) }),
+      setDownloadedModels: (models) => set({ downloadedModels: models.filter(m => !isExcludedTextModel(m)) }),
       addDownloadedModel: (model) =>
         set((state) => {
-          if (isSuspiciousRecoveredTextModel(model)) return state;
+          if (isExcludedTextModel(model)) return state;
           return {
             downloadedModels: [...state.downloadedModels.filter(m => m.id !== model.id), model],
           };
@@ -235,6 +334,12 @@ export const useAppStore = create<AppState>()(
         })),
       activeModelId: null,
       setActiveModelId: (modelId) => set({ activeModelId: modelId }),
+      loadedTextModelId: null,
+      setLoadedTextModelId: (modelId) => set({ loadedTextModelId: modelId }),
+      textModelEvicted: false,
+      setTextModelEvicted: (evicted) => set({ textModelEvicted: evicted }),
+      lastTextModelId: null,
+      setLastTextModelId: (modelId) => set({ lastTextModelId: modelId }),
       isLoadingModel: false,
       setIsLoadingModel: (loading) => set({ isLoadingModel: loading }),
       modelMaxContext: null,
@@ -301,6 +406,11 @@ export const useAppStore = create<AppState>()(
       markSpotlightShown: (key) =>
         set((state) => ({ shownSpotlights: { ...state.shownSpotlights, [key]: true } })),
       resetShownSpotlights: () => set({ shownSpotlights: {} }),
+      warmedImageModels: [],
+      markImageModelWarmed: (modelId) =>
+        set((state) => state.warmedImageModels.includes(modelId)
+          ? state
+          : { warmedImageModels: [...state.warmedImageModels, modelId] }),
       textGenerationCount: 0,
       imageGenerationCount: 0,
       incrementTextGenerationCount: () => { const c = get().textGenerationCount + 1; set({ textGenerationCount: c }); return c; },
@@ -309,8 +419,14 @@ export const useAppStore = create<AppState>()(
       setHasEngagedSharePrompt: (v) => set({ hasEngagedSharePrompt: v }),
       hasRegisteredPro: false,
       setHasRegisteredPro: (v) => set({ hasRegisteredPro: v }),
+      isProActive: false,
+      setProActive: (v) => set({ isProActive: v }),
+      devProDisabled: false,
+      setDevProDisabled: (v) => set({ devProDisabled: v }),
       proBannerDismissed: false,
       setProBannerDismissed: (v) => set({ proBannerDismissed: v }),
+      desktopPromoDismissed: false,
+      setDesktopPromoDismissed: (v) => set({ desktopPromoDismissed: v }),
       proAhaTriggeredBy: null,
       setProAhaTriggeredBy: (by) => set({ proAhaTriggeredBy: by }),
       toolCountHintDismissed: false,
@@ -329,14 +445,18 @@ export const useAppStore = create<AppState>()(
         onboardingChecklist: state.onboardingChecklist,
         checklistDismissed: state.checklistDismissed,
         activeModelId: state.activeModelId,
+        lastTextModelId: state.lastTextModelId,
         settings: state.settings,
         activeImageModelId: state.activeImageModelId,
         generatedImages: state.generatedImages,
         shownSpotlights: state.shownSpotlights,
+        warmedImageModels: state.warmedImageModels,
         textGenerationCount: state.textGenerationCount, imageGenerationCount: state.imageGenerationCount,
         hasEngagedSharePrompt: state.hasEngagedSharePrompt,
         hasRegisteredPro: state.hasRegisteredPro,
+        devProDisabled: state.devProDisabled,
         proBannerDismissed: state.proBannerDismissed,
+        desktopPromoDismissed: state.desktopPromoDismissed,
         proAhaTriggeredBy: state.proAhaTriggeredBy,
         loadedSettings: state.loadedSettings,
       }),

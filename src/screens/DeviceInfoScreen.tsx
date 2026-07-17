@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,19 @@ export const DeviceInfoScreen: React.FC = () => {
 
   const totalRamGB = hardwareService.getTotalMemoryGB();
   const deviceTier = hardwareService.getDeviceTier();
+
+  // Live per-process memory (os_proc): available, footprint, and the derived LIMIT.
+  // The LIMIT (available + footprint) is what iOS actually caps this app at — the real
+  // reason a model can be refused on a high-RAM device. Total RAM alone is misleading.
+  const [proc, setProc] = useState<{ availableMB: number; footprintMB: number; limitMB: number } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    hardwareService.getProcessMemory()
+      .then((p) => { if (alive) setProc(p); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const gb = (mb: number) => `${(mb / 1024).toFixed(1)} GB`;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -54,6 +67,18 @@ export const DeviceInfoScreen: React.FC = () => {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t('deviceInfo.totalRAM')}</Text>
             <Text style={styles.infoValue}>{totalRamGB.toFixed(1)} GB</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Available Now</Text>
+            <Text style={styles.infoValue}>{proc ? gb(proc.availableMB) : '…'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>App Footprint</Text>
+            <Text style={styles.infoValue}>{proc ? gb(proc.footprintMB) : '…'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Process Limit</Text>
+            <Text style={styles.infoValue}>{proc ? gb(proc.limitMB) : '…'}</Text>
           </View>
           <View style={[styles.infoRow, styles.lastRow]}>
             <Text style={styles.infoLabel}>{t('deviceInfo.deviceTier')}</Text>

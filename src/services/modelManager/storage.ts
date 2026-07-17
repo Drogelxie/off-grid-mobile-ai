@@ -5,8 +5,8 @@ import { LMSTUDIO_AUTHORS, OFFICIAL_MODEL_AUTHORS, VERIFIED_QUANTIZERS } from '.
 import { getCuratedLiteRTEntry } from '../curatedLiteRTRegistry';
 import logger from '../../utils/logger';
 
-export const MODELS_STORAGE_KEY = '@local_llm/downloaded_models';
-export const IMAGE_MODELS_STORAGE_KEY = '@local_llm/downloaded_image_models';
+const MODELS_STORAGE_KEY = '@local_llm/downloaded_models';
+const IMAGE_MODELS_STORAGE_KEY = '@local_llm/downloaded_image_models';
 
 export function determineCredibility(author: string): ModelCredibility {
   if (LMSTUDIO_AUTHORS.includes(author)) {
@@ -176,7 +176,8 @@ export async function loadDownloadedModels(modelsDir: string): Promise<Downloade
       if (m.engine === 'litert') {
         const curated = getCuratedLiteRTEntry(m.fileName);
         const liteRTVision = curated?.liteRTVision ?? m.liteRTVision ?? false;
-        return { ...m, liteRTVision } as LiteRTDownloadedModel;
+        const liteRTAudio = curated?.liteRTAudio ?? m.liteRTAudio ?? false;
+        return { ...m, liteRTVision, liteRTAudio } as LiteRTDownloadedModel;
       }
       return { ...m, engine: 'llama' as const } as LlamaDownloadedModel;
     });
@@ -329,10 +330,12 @@ export async function buildDownloadedModel(opts: BuildModelOpts): Promise<Downlo
 
   if (isLiteRT) {
     const liteRTVision = curatedLiteRT?.liteRTVision ?? file.liteRTVision ?? false;
+    const liteRTAudio = curatedLiteRT?.liteRTAudio ?? file.liteRTAudio ?? false;
     const liteRTModel: LiteRTDownloadedModel = {
       ...commonFields,
       engine: 'litert',
       liteRTVision,
+      liteRTAudio,
     };
     return liteRTModel;
   }

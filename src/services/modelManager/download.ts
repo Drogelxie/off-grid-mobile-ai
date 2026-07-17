@@ -10,13 +10,115 @@ import {
   BackgroundDownloadMetadataCallback,
   BackgroundDownloadContext,
 } from './types';
-import { buildDownloadedModel, persistDownloadedModel, loadDownloadedModels, saveModelsList } from './storage';
+import { buildDownloadedModel, persistDownloadedModel } from './storage';
 import logger from '../../utils/logger';
 import { useDownloadStore } from '../../stores/downloadStore';
 import { makeModelKey } from '../../utils/modelKey';
+import { extractBaseName } from './scan';
 
-export function mmProjLocalName(ggufFileName: string): string {
-  return `${ggufFileName.replace(/\.gguf$/i, '')}-mmproj.gguf`;
+/**
+ * The on-disk projector name for a model — QUANT-INDEPENDENT (built from extractBaseName = name+variant,
+ * quant stripped). One projector serves every quant of a model, so all quants map to the SAME file: the
+ * existence check then skips re-downloading the projector when a second quant is fetched, and the repair
+ * path resolves to the identical name (no more `…-Q4_K_M-mmproj.gguf` vs `…-mmproj-F16.gguf` divergence).
+ */
+export function mmProjLocalName(ggufFileName: string, mmProjSourceName?: string): string {
+  const base = extractBaseName(ggufFileName);
+  // Keep the projector's OWN precision (mmproj-F16 / mmproj-BF16) from its source filename, but strip any
+  // model prefix the repo added — so the on-disk name is `<model-base>-mmproj-<precision>.gguf`:
+  //  - model-prefixed  → two repos that both ship `mmproj-F16.gguf` can't collide on disk (the original loss),
+  //  - MODEL-quant-independent (extractBaseName drops the model quant) → every quant shares ONE projector file.
+  const proj = mmProjSourceName?.match(/mmproj.*$/i)?.[0] ?? 'mmproj.gguf';
+  return `${base}-${proj}`;
+}
+
+export interface MmProjRepairDownloadOpts {
+  modelId: string;
+  file: ModelFile;
+  modelsDir: string;
+  onProgress?: DownloadProgressCallback;
+  onDownloadIdReady?: (id: string) => void;
+}
+
+/**
+ * Re-download a model's mmproj (vision projector) sidecar, routing progress through
+ * the SAME download-store rows the normal download writes so the existing determinate
+ * progress bar lights up during the ~900MB fetch instead of an indeterminate spinner
+ * (BUG OD2). The store row is keyed on the model's modelKey (`repo/file`) — the id the
+ * completed model carries — and torn down once the repair settles. Returns the local
+ * path the mmproj resolved to.
+ */
+export async function performMmProjRepairDownload(opts: MmProjRepairDownloadOpts): Promise<string> {
+  const { modelId, file, modelsDir, onProgress, onDownloadIdReady } = opts;
+  const mmProjFile = file.mmProjFile;
+  if (!mmProjFile) throw new Error('Model file has no associated mmproj');
+
+  const modelKey = makeModelKey(modelId, file.name);
+  // Same quant-independent name the normal download uses — repair and download must agree on the file.
+  const mmProjLocalPath = `${modelsDir}/${mmProjLocalName(file.name, file.mmProjFile?.name)}`;
+  const totalBytes = mmProjFile.size;
+  if (await RNFS.exists(mmProjLocalPath)) await RNFS.unlink(mmProjLocalPath).catch(() => {});
+
+  const info = await backgroundDownloadService.startDownload({
+    url: mmProjFile.downloadUrl,
+    fileName: mmProjFile.name,
+    modelId,
+    totalBytes,
+  });
+  onDownloadIdReady?.(info.downloadId);
+
+  useDownloadStore.getState().add({
+    modelKey,
+    downloadId: info.downloadId,
+    modelId,
+    fileName: mmProjFile.name,
+    quantization: file.quantization ?? '',
+    modelType: 'text',
+    status: 'running',
+    bytesDownloaded: 0,
+    totalBytes,
+    combinedTotalBytes: totalBytes,
+    progress: 0,
+    createdAt: Date.now(),
+  });
+
+  let resolvedPath = mmProjLocalPath;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const removeProgress = backgroundDownloadService.onProgress(info.downloadId, (event) => {
+        useDownloadStore.getState().updateProgress(info.downloadId, event.bytesDownloaded, totalBytes);
+        onProgress?.({
+          downloadId: info.downloadId,
+          modelId,
+          fileName: mmProjFile.name,
+          bytesDownloaded: event.bytesDownloaded,
+          totalBytes,
+          progress: totalBytes > 0 ? event.bytesDownloaded / totalBytes : 0,
+        });
+      });
+      const removeComplete = backgroundDownloadService.onComplete(info.downloadId, async (event) => {
+        removeProgress(); removeComplete(); removeError();
+        try {
+          resolvedPath = await backgroundDownloadService.moveCompletedDownload(info.downloadId, mmProjLocalPath);
+        } catch {
+          resolvedPath = event.localUri?.replace('file://', '') || mmProjLocalPath;
+        }
+        useDownloadStore.getState().setCompleted(info.downloadId);
+        resolve();
+      });
+      const removeError = backgroundDownloadService.onError(info.downloadId, (err) => {
+        removeProgress(); removeComplete(); removeError();
+        useDownloadStore.getState().setStatus(info.downloadId, 'failed', { message: err.reason || 'Download failed' });
+        reject(new Error(err.reason || 'Download failed'));
+      });
+      backgroundDownloadService.startProgressPolling();
+    });
+    return resolvedPath;
+  } finally {
+    // The repair row is transient — remove it once settled so the completed model
+    // (rebuilt via loadDownloadedModels) is the only surviving row.
+    useDownloadStore.getState().remove(modelKey);
+  }
 }
 
 function makeAlreadyDownloadedId(modelId: string, fileName: string): string {
@@ -28,7 +130,7 @@ export {
   getOrphanedImageDirs,
   syncCompletedBackgroundDownloads,
 } from './downloadHelpers';
-export type { SyncDownloadsOpts } from './downloadHelpers';
+;
 
 export interface PerformBackgroundDownloadOpts {
   modelId: string;
@@ -43,7 +145,7 @@ export async function performBackgroundDownload(opts: PerformBackgroundDownloadO
   const { modelId, file, modelsDir, backgroundDownloadContext, backgroundDownloadMetadataCallback, onProgress } = opts;
   const localPath = `${modelsDir}/${file.name}`;
   const mmProjLocalPath = file.mmProjFile
-    ? `${modelsDir}/${mmProjLocalName(file.name)}`
+    ? `${modelsDir}/${mmProjLocalName(file.name, file.mmProjFile?.name)}`
     : null;
 
   const mainExists = await RNFS.exists(localPath);
@@ -124,11 +226,43 @@ async function startBgDownload(opts: StartBgDownloadOpts): Promise<BackgroundDow
   const skipSizeValidation = modelId.startsWith('offgrid/');
   const metadataObj: Record<string, unknown> = {};
   if (needsMmProj) {
-    metadataObj.mmProjFileName = mmProjLocalName(file.name);
+    metadataObj.mmProjFileName = mmProjLocalName(file.name, file.mmProjFile?.name);
     metadataObj.mmProjDownloadUrl = file.mmProjFile?.downloadUrl;
   }
   if (skipSizeValidation) metadataObj.skipSizeValidation = true;
   const metadataJson = Object.keys(metadataObj).length > 0 ? JSON.stringify(metadataObj) : undefined;
+
+  // Start the mmproj sidecar BEFORE the main, so the MAIN is the last download started
+  // before we return and the caller attaches watchDownload. Otherwise, under the 3-cap,
+  // the main starts, then this function blocks awaiting the sidecar's *queued* start —
+  // during that (possibly minutes-long) wait the main can complete and fire its one
+  // DownloadComplete with no listener attached yet (lost → finalize hangs at 100%). With
+  // the sidecar first, nothing long is awaited after the main starts, so the watcher is
+  // live before the main can complete (the reconcile then covers the microtask gap).
+  let mmProjDownloadId: string | undefined;
+  if (needsMmProj) {
+    const mmProjFile = file.mmProjFile!;
+    logger.log('[DownloadDebug] Starting mmproj sidecar download', {
+      modelKey, modelId, fileName: file.name,
+      mmProjFileName: mmProjLocalName(file.name, file.mmProjFile?.name), mmProjBytes: mmProjFile.size,
+    });
+    const mmProjInfo = await backgroundDownloadService.startDownload({
+      url: mmProjFile.downloadUrl,
+      fileName: mmProjLocalName(file.name, file.mmProjFile?.name),
+      modelId,
+      modelType: 'text',
+      totalBytes: mmProjFile.size,
+      sha256: mmProjFile.sha256,
+      // Dependent sub-download of the main GGUF — doesn't occupy a concurrency slot, so a
+      // vision file's main+mmproj count as ONE logical download against the 3-cap (else
+      // one vision file held two slots and only one file could download at a time).
+      isSidecar: true,
+    });
+    mmProjDownloadId = mmProjInfo.downloadId;
+    logger.log('[DownloadDebug] mmproj sidecar download started', {
+      modelKey, modelId, fileName: file.name, mmProjDownloadId,
+    });
+  }
 
   const downloadInfo = await backgroundDownloadService.startDownload({
     url: downloadUrl,
@@ -147,6 +281,7 @@ async function startBgDownload(opts: StartBgDownloadOpts): Promise<BackgroundDow
     modelId,
     fileName: file.name,
     mainDownloadId: downloadInfo.downloadId,
+    mmProjDownloadId,
     totalBytes: file.size,
     combinedTotalBytes,
     needsMmProj,
@@ -155,9 +290,16 @@ async function startBgDownload(opts: StartBgDownloadOpts): Promise<BackgroundDow
 
   const existing = useDownloadStore.getState().downloads[modelKey];
   if (existing) {
-    await backgroundDownloadService.cancelDownload(existing.downloadId).catch(() => {});
-    if (existing.mmProjDownloadId) {
-      await backgroundDownloadService.cancelDownload(existing.mmProjDownloadId).catch(() => {});
+    // A `queued:<modelKey>` placeholder row (added by startModelDownload to show the
+    // queued state immediately) has NO native download behind it — cancelling it would
+    // wrongly free a concurrency slot. Only cancel real native ids; then reconcile the
+    // row to the real downloadId either way.
+    const isPlaceholder = String(existing.downloadId).startsWith('queued:');
+    if (!isPlaceholder) {
+      await backgroundDownloadService.cancelDownload(existing.downloadId).catch(() => {});
+      if (existing.mmProjDownloadId) {
+        await backgroundDownloadService.cancelDownload(existing.mmProjDownloadId).catch(() => {});
+      }
     }
     useDownloadStore.getState().retryEntry(modelKey, downloadInfo.downloadId);
   } else {
@@ -175,42 +317,20 @@ async function startBgDownload(opts: StartBgDownloadOpts): Promise<BackgroundDow
       progress: 0,
       createdAt: Date.now(),
       ...(needsMmProj && {
-        mmProjFileName: mmProjLocalName(file.name),
+        mmProjFileName: mmProjLocalName(file.name, file.mmProjFile?.name),
         mmProjFileSize: file.mmProjFile?.size,
       }),
+      // Persist metadataJson on the store row too, not just in the native download — it
+      // carries mmProjDownloadUrl, which iOS retry/reconcile (restartIosTextDownload) needs
+      // to re-issue the vision sidecar (foreground URLSession can't resume, so it rebuilds
+      // the job from scratch). Without it, metadataJson only appeared after a hydrate from
+      // native (an app restart), so a same-session retry silently re-fetched the main GGUF
+      // alone and dropped the vision projector.
+      metadataJson,
     });
   }
-
-  // Start mmproj download in parallel if needed
-  let mmProjDownloadId: string | undefined;
-  if (needsMmProj) {
-    const mmProjFile = file.mmProjFile!;
-    logger.log('[DownloadDebug] Starting mmproj sidecar download', {
-      modelKey,
-      modelId,
-      fileName: file.name,
-      mainDownloadId: downloadInfo.downloadId,
-      mmProjFileName: mmProjLocalName(file.name),
-      mmProjBytes: mmProjFile.size,
-    });
-    const mmProjInfo = await backgroundDownloadService.startDownload({
-      url: mmProjFile.downloadUrl,
-      fileName: mmProjLocalName(file.name),
-      modelId,
-      modelType: 'text',
-      totalBytes: mmProjFile.size,
-      sha256: mmProjFile.sha256,
-    });
-    mmProjDownloadId = mmProjInfo.downloadId;
-    logger.log('[DownloadDebug] mmproj sidecar download started', {
-      modelKey,
-      modelId,
-      fileName: file.name,
-      mainDownloadId: downloadInfo.downloadId,
-      mmProjDownloadId,
-    });
-    useDownloadStore.getState().setMmProjDownloadId(modelKey, mmProjDownloadId);
-  }
+  // Record the sidecar id on the (now-present) store row for restore + cancel.
+  if (mmProjDownloadId) useDownloadStore.getState().setMmProjDownloadId(modelKey, mmProjDownloadId);
 
   backgroundDownloadMetadataCallback?.(downloadInfo.downloadId as any, {
     modelId, fileName: file.name, quantization: file.quantization, author,
@@ -459,7 +579,29 @@ export function watchBackgroundDownload(opts: WatchDownloadOpts): void {
     cleanupListeners();
     backgroundDownloadContext.delete(downloadId);
     try {
-      const finalPath = await backgroundDownloadService.moveCompletedDownload(downloadId, ctx.localPath);
+      // Idempotent move: a native record can report 'completed' yet reject the move
+      // (NOT_COMPLETED / NOT_FOUND) when it was already moved in a PRIOR session — its
+      // localUri is cleared but the file is already at ctx.localPath. Restore re-adopts
+      // such a record every foreground, so a plain failure here loops forever
+      // ("Finalization failed: Download N not completed yet" on every launch). If the
+      // final file is already on disk, finalize from it; only a genuinely-absent file is
+      // a real failure.
+      let movedNatively = true;
+      let finalPath: string;
+      try {
+        finalPath = await backgroundDownloadService.moveCompletedDownload(downloadId, ctx.localPath);
+      } catch (moveErr) {
+        if (await RNFS.exists(ctx.localPath)) {
+          movedNatively = false;
+          finalPath = ctx.localPath;
+          logger.log('[DownloadDebug] native move rejected but file present — finalizing from disk (idempotent)', {
+            downloadId, modelId: ctx.modelId, localPath: ctx.localPath,
+            error: moveErr instanceof Error ? moveErr.message : String(moveErr),
+          });
+        } else {
+          throw moveErr;
+        }
+      }
       const mmProjFileExists = ctx.mmProjLocalPath ? await RNFS.exists(ctx.mmProjLocalPath) : false;
       const finalMmProjPath = ctx.mmProjLocalPath && mmProjFileExists ? ctx.mmProjLocalPath : undefined;
       logger.log('[DownloadDebug] Finalization paths resolved', {
@@ -491,6 +633,10 @@ export function watchBackgroundDownload(opts: WatchDownloadOpts): void {
       });
       backgroundDownloadMetadataCallback?.(downloadId, null);
       onComplete?.(model);
+      // When we finalized from an already-on-disk file (native move was skipped), the
+      // stale native record still lingers as 'completed'-without-localUri and restore
+      // would re-adopt + re-finalize it every foreground. Purge it so it can't loop.
+      if (!movedNatively) backgroundDownloadService.purgeNativeRecord(downloadId).catch(() => {});
     } catch (error) {
       ctx.isFinalizing = false;
       logger.error('[DownloadDebug] Finalization failed', {
@@ -503,7 +649,10 @@ export function watchBackgroundDownload(opts: WatchDownloadOpts): void {
     }
   };
 
-  const removeMainComplete = backgroundDownloadService.onComplete(downloadId, async () => {
+  // One completion handler per download, invoked by EITHER the live onComplete event
+  // OR the reconcile below — so a completion that fired before we subscribed is never
+  // lost (was previously true only for the mmproj; the main could hang at 100%).
+  const handleMainComplete = async () => {
     if (ctx.mainCompleteHandled) return;
     ctx.mainCompleteHandled = true;
     ctx.mainCompleted = true;
@@ -514,34 +663,37 @@ export function watchBackgroundDownload(opts: WatchDownloadOpts): void {
       mmProjDownloadId: ctx.mmProjDownloadId,
     });
     await tryFinalize();
-  });
+  };
+  const handleMmProjComplete = async () => {
+    if (ctx.mmProjCompleteHandled) return;
+    ctx.mmProjCompleteHandled = true;
+    logger.log('[DownloadDebug] mmproj complete, moving sidecar file', {
+      downloadId,
+      modelId: ctx.modelId,
+      fileName: ctx.file.name,
+      mmProjDownloadId: ctx.mmProjDownloadId,
+      mmProjLocalPath: ctx.mmProjLocalPath,
+    });
+    try {
+      await backgroundDownloadService.moveCompletedDownload(ctx.mmProjDownloadId!, ctx.mmProjLocalPath!);
+    } catch (moveErr) {
+      const targetExists = ctx.mmProjLocalPath ? await RNFS.exists(ctx.mmProjLocalPath) : false;
+      if (!targetExists) {
+        logger.warn('[ModelManager] mmproj move failed and target not found, continuing without vision:', moveErr);
+        ctx.mmProjLocalPath = null;
+      }
+    }
+    ctx.mmProjCompleted = true;
+    await tryFinalize();
+  };
+
+  const removeMainComplete = backgroundDownloadService.onComplete(downloadId, handleMainComplete);
   const removeMainError = backgroundDownloadService.onError(downloadId, (event) => {
     handleError(new Error(event.reason || 'Download failed'));
   });
 
   if (ctx.mmProjDownloadId && !ctx.mmProjCompleted) {
-    removeMmProjComplete = backgroundDownloadService.onComplete(ctx.mmProjDownloadId, async (event) => {
-      if (ctx.mmProjCompleteHandled) return;
-      ctx.mmProjCompleteHandled = true;
-      logger.log('[DownloadDebug] mmproj complete, moving sidecar file', {
-        downloadId,
-        modelId: ctx.modelId,
-        fileName: ctx.file.name,
-        mmProjDownloadId: event.downloadId,
-        mmProjLocalPath: ctx.mmProjLocalPath,
-      });
-      try {
-        await backgroundDownloadService.moveCompletedDownload(event.downloadId, ctx.mmProjLocalPath!);
-      } catch (moveErr) {
-        const targetExists = ctx.mmProjLocalPath ? await RNFS.exists(ctx.mmProjLocalPath) : false;
-        if (!targetExists) {
-          logger.warn('[ModelManager] mmproj move failed and target not found, continuing without vision:', moveErr);
-          ctx.mmProjLocalPath = null;
-        }
-      }
-      ctx.mmProjCompleted = true;
-      await tryFinalize();
-    });
+    removeMmProjComplete = backgroundDownloadService.onComplete(ctx.mmProjDownloadId, handleMmProjComplete);
     removeMmProjError = backgroundDownloadService.onError(ctx.mmProjDownloadId, (event) => {
       // mmproj failure must NOT fail the parent download. Treat as
       // text-only-with-repair-needed: clear the mmproj path, mark sidecar
@@ -574,42 +726,27 @@ export function watchBackgroundDownload(opts: WatchDownloadOpts): void {
     });
   }
 
-  // Catch-up guard: the mmproj sidecar is small and may complete in native
-  // before the onComplete listener above was registered. The native service
-  // fires the event exactly once — if there is no subscriber at that moment
-  // the event is permanently lost, ctx.mmProjCompleted stays false, and
-  // tryFinalize waits forever (progress bar stuck at 100%).
-  // Fix: query native downloads immediately after registering the listener.
-  // If the mmproj row is already 'completed', simulate the onComplete ourselves.
-  // mmProjCompleteHandled guards against a double-execution if the listener
-  // also fires concurrently.
-  if (ctx.mmProjDownloadId && !ctx.mmProjCompleted) {
-    backgroundDownloadService.getActiveDownloads().then(async (downloads) => {
-      const mmProjRow = (downloads as Array<{ downloadId: string; status: string }>)
-        .find(d => d.downloadId === ctx.mmProjDownloadId);
-      if (mmProjRow?.status === 'completed' && !ctx.mmProjCompleteHandled) {
-        ctx.mmProjCompleteHandled = true;
-        logger.log('[DownloadDebug] mmproj catch-up: completed before onComplete listener registered', {
-          downloadId,
-          mmProjDownloadId: ctx.mmProjDownloadId,
-          mmProjLocalPath: ctx.mmProjLocalPath,
-        });
-        try {
-          await backgroundDownloadService.moveCompletedDownload(ctx.mmProjDownloadId!, ctx.mmProjLocalPath!);
-        } catch (moveErr) {
-          const targetExists = ctx.mmProjLocalPath ? await RNFS.exists(ctx.mmProjLocalPath) : false;
-          if (!targetExists) {
-            logger.warn('[ModelManager] mmproj catch-up move failed, continuing without vision:', moveErr);
-            ctx.mmProjLocalPath = null;
-          }
-        }
-        ctx.mmProjCompleted = true;
-        await tryFinalize();
-      }
-    }).catch(() => {});
-  }
+  // Catch-up reconcile: the native service fires onComplete exactly once — if a
+  // download already completed before we subscribed (a fast/cached main, or listener
+  // setup delayed behind an awaited-queued sidecar), the event is permanently lost and
+  // tryFinalize would wait forever (progress stuck at 100%). Query native ONCE and, for
+  // whichever of main/mmproj is already 'completed', run its completion handler (the
+  // *CompleteHandled flags guard against a double-run if the live event also fires).
+  // Covers BOTH downloads via one reconcile — previously only the mmproj had a catch-up.
+  backgroundDownloadService.getActiveDownloads().then(async (downloads) => {
+    const rows = downloads as Array<{ downloadId: string; status: string }>;
+    const isDone = (id?: string) => !!id && rows.find(d => d.downloadId === id)?.status === 'completed';
+    if (isDone(downloadId) && !ctx.mainCompleteHandled) {
+      logger.log('[DownloadDebug] main catch-up: completed before onComplete listener registered', { downloadId, modelId: ctx.modelId });
+      await handleMainComplete();
+    }
+    if (ctx.mmProjDownloadId && !ctx.mmProjCompleted && isDone(ctx.mmProjDownloadId) && !ctx.mmProjCompleteHandled) {
+      logger.log('[DownloadDebug] mmproj catch-up: completed before onComplete listener registered', { downloadId, mmProjDownloadId: ctx.mmProjDownloadId });
+      await handleMmProjComplete();
+    }
+  }).catch(() => {});
 
   tryFinalize().catch(() => {});
 }
 
-export { loadDownloadedModels, saveModelsList };
+;

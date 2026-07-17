@@ -3,16 +3,19 @@ import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Card } from '../../components';
 import { useTheme, useThemedStyles } from '../../theme';
+import { useDownloadStore } from '../../stores/downloadStore';
 import { BackgroundDownloadReasonCode } from '../../types';
 import { needsVisionRepair as checkNeedsVisionRepair } from '../../utils/visionRepair';
 import { getDownloadStatusLabel, isRetryable } from '../../utils/downloadErrors';
+import { downloadStatusIcon } from '../../utils/downloadStatusIcon';
+import { formatBytes } from '../../utils/formatBytes';
 import { createStyles } from './styles';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type DownloadItem = {
   type: 'active' | 'completed';
-  modelType: 'text' | 'image';
+  modelType: 'text' | 'image' | 'tts' | 'stt';
   downloadId?: string;
   modelKey?: string;
   modelId: string;
@@ -35,25 +38,9 @@ export type DownloadItem = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(i > 1 ? 2 : 0)} ${sizes[i]}`;
-}
-
-export function extractQuantization(fileName: string): string {
-  if (fileName.toLowerCase().includes('coreml')) return 'Core ML';
-  const upperName = fileName.toUpperCase();
-  const patterns = ['Q2_K', 'Q3_K_S', 'Q3_K_M', 'Q4_0', 'Q4_K_S', 'Q4_K_M', 'Q5_K_S', 'Q5_K_M', 'Q6_K', 'Q8_0'];
-  for (const pattern of patterns) {
-    if (upperName.includes(pattern.replace('_', ''))) return pattern;
-    if (upperName.includes(pattern)) return pattern;
-  }
-  const match = /[QqFf]\d+_?[KkMmSs]*/.exec(fileName);
-  return match ? match[0].toUpperCase() : 'Unknown';
-}
+// Re-export the canonical byte formatter so the Download Manager modules that
+// import it from here keep working, with one shared implementation.
+export { formatBytes } from '../../utils/formatBytes';
 
 export function getStatusText(status: string): string {
   if (status === 'running') return 'Downloading...';
@@ -93,12 +80,9 @@ export const ActiveDownloadCard: React.FC<ActiveDownloadCardProps> = ({ item, on
         ? colors.warning
         : colors.primary;
 
-  const getStatusIcon = () => {
-    if (item.status === 'failed') return 'alert-circle';
-    if (item.status === 'retrying') return 'refresh-cw';
-    if (item.status === 'waiting_for_network') return 'wifi-off';
-    return null;
-  };
+  // Icon per status is owned by downloadStatusIcon() so this row and ModelCard match
+  // (queued -> clock, previously text-only here).
+  const getStatusIcon = () => downloadStatusIcon(item.status);
 
   const getStatusIconColor = () => {
     if (item.status === 'failed') return colors.error;
@@ -138,14 +122,18 @@ export const ActiveDownloadCard: React.FC<ActiveDownloadCardProps> = ({ item, on
             <Text style={styles.quantText}>{item.quantization}</Text>
           </View>
         )}
-        {!!getStatusLabel(item) && (
+        {(!!getStatusLabel(item) || !!getStatusIcon()) && (
           <View style={styles.statusIconRow}>
             {getStatusIcon() && (
-              <Icon name={getStatusIcon()!} size={14} color={getStatusIconColor()} />
+              <Icon name={getStatusIcon()!} size={14} color={getStatusIconColor()} accessibilityLabel={getStatusText(item.status)} />
             )}
-            <Text style={[styles.statusText, item.status === 'failed' && { color: colors.error }]}>
-              {getStatusLabel(item)}
-            </Text>
+            {/* Queued is icon-only (clock) — the word is redundant next to it. Other states
+                (failed/retrying/network) keep their explanatory text. */}
+            {item.status !== 'pending' && !!getStatusLabel(item) && (
+              <Text style={[styles.statusText, item.status === 'failed' && { color: colors.error }]}>
+                {getStatusLabel(item)}
+              </Text>
+            )}
           </View>
         )}
       </View>
@@ -182,19 +170,43 @@ interface CompletedDownloadCardProps {
   isRepairingVision?: boolean;
 }
 
+/** Feather icon for a completed model row. A vision model missing its projector reads as
+ *  "needs repair" (wrench), not "has vision" (eye) — actionable-broken, not a working capability. */
+function modelTypeIconName(item: DownloadItem, needsVisionRepair: boolean): string {
+  if (item.modelType === 'image') return 'image';
+  if (item.modelType === 'tts') return 'volume-2';
+  if (item.modelType === 'stt') return 'mic';
+  if (needsVisionRepair) return 'tool';
+  if (item.isVisionModel) return 'eye';
+  return 'message-square';
+}
+
+function modelTypeIconColor(item: DownloadItem, needsVisionRepair: boolean, colors: ReturnType<typeof useTheme>['colors']): string {
+  if (item.modelType === 'image') return colors.info;
+  if (item.modelType === 'tts' || item.modelType === 'stt') return colors.success;
+  if (needsVisionRepair || item.isVisionModel) return colors.warning;
+  return colors.primary;
+}
+
 export const CompletedDownloadCard: React.FC<CompletedDownloadCardProps> = ({ item, onDelete, onRepairVision, isRepairingVision = false }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const needsVisionRepair = checkNeedsVisionRepair(item);
+  // A vision repair drives a live download-store row keyed on the completed
+  // model's modelKey (`repo/file` = item.modelId). Read it so the SAME
+  // determinate progress bar the normal download shows lights up during the
+  // ~900MB mmproj re-download, instead of a bare indeterminate spinner (OD2).
+  const repairEntry = useDownloadStore(s => s.downloads[item.modelId]);
+  const showRepairProgress = isRepairingVision && !!repairEntry;
 
   return (
     <Card style={styles.downloadCard}>
       <View style={styles.downloadHeader}>
         <View style={styles.modelTypeIcon}>
           <Icon
-            name={item.modelType === 'image' ? 'image' : 'message-square'}
+            name={modelTypeIconName(item, needsVisionRepair)}
             size={16}
-            color={item.modelType === 'image' ? colors.info : colors.primary}
+            color={modelTypeIconColor(item, needsVisionRepair, colors)}
           />
         </View>
         <View style={styles.downloadInfo}>
@@ -207,7 +219,7 @@ export const CompletedDownloadCard: React.FC<CompletedDownloadCardProps> = ({ it
             testID="repair-vision-button"
             onPress={() => onRepairVision(item)}
           >
-            <Icon name="eye" size={18} color={colors.warning} />
+            <Icon name="tool" size={18} color={colors.warning} />
           </TouchableOpacity>
         )}
         <TouchableOpacity
@@ -218,6 +230,16 @@ export const CompletedDownloadCard: React.FC<CompletedDownloadCardProps> = ({ it
           <Icon name="trash-2" size={18} color={colors.error} />
         </TouchableOpacity>
       </View>
+      {showRepairProgress && (
+        <View style={styles.progressContainer} testID="repair-vision-progress">
+          <View style={styles.progressBarBackground}>
+            <View style={[styles.progressBarFill, { width: `${Math.round(repairEntry.progress * 100)}%` as const, backgroundColor: colors.primary }]} />
+          </View>
+          <Text style={styles.progressText}>
+            {formatBytes(repairEntry.bytesDownloaded)} / {formatBytes(repairEntry.totalBytes)}
+          </Text>
+        </View>
+      )}
       <View style={styles.downloadMeta}>
         {!!item.quantization && (
           <View style={[styles.quantBadge, item.modelType === 'image' && styles.imageBadge]}>
@@ -232,7 +254,7 @@ export const CompletedDownloadCard: React.FC<CompletedDownloadCardProps> = ({ it
         )}
         {isRepairingVision && (
           <View style={styles.repairingBadge} testID="repairing-vision-badge">
-            <ActivityIndicator size="small" color={colors.warning} />
+            <ActivityIndicator size="small" color={colors.primary} />
             <Text style={styles.repairingBadgeText}>Repairing</Text>
           </View>
         )}

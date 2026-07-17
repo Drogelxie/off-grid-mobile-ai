@@ -2,18 +2,17 @@ import RNFS from 'react-native-fs';
 import { guessStyle, HFImageModel } from '../../services/huggingFaceModelBrowser';
 import { ModelInfo, ImageModelRecommendation, SoCInfo } from '../../types';
 import { ImageModelDescriptor, ModelTypeFilter } from './types';
+import { imageBackendLabel } from '../../utils/imageBackend';
+import { looksLikeVisionModel } from '../../utils/visionModel';
+
+// Re-export the canonical byte formatter so existing importers keep working while
+// there is only ONE implementation (see src/utils/formatBytes.ts).
+export { formatBytes } from '../../utils/formatBytes';
 
 export function formatNumber(num: number): string {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return num.toString();
-}
-
-export function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${bytes} B`;
 }
 
 export async function getDirectorySize(dirPath: string): Promise<number> {
@@ -41,11 +40,9 @@ function isImageGenModel(tags: string[], name: string, id: string): boolean {
 }
 
 function isVisionModel(tags: string[], name: string, id: string): boolean {
-  return (
-    tags.some(t => t.includes('vision') || t.includes('multimodal') || t.includes('image-text')) ||
-    name.includes('vision') || name.includes('vlm') || name.includes('llava') ||
-    id.includes('vision') || id.includes('vlm') || id.includes('llava')
-  );
+  // Single source of truth (utils/visionModel) — was a 3-keyword subset that missed Pixtral/
+  // Moondream/InternVL etc., so they showed as text locally but vision remotely (DR2).
+  return looksLikeVisionModel({ name, id, tags });
 }
 
 function isCodeModel(tags: string[], name: string, id: string): boolean {
@@ -68,7 +65,7 @@ export function getModelType(model: ModelInfo): ModelTypeFilter {
 
 // -- Text model compatibility helper --
 
-export function isPhiModel(modelName: string, modelId: string): boolean {
+function isPhiModel(modelName: string, modelId: string): boolean {
   const name = modelName.toLowerCase();
   const id = modelId.toLowerCase();
   return name.includes('phi') || id.includes('phi');
@@ -146,8 +143,7 @@ export function hfModelToDescriptor(
     name: hfModel.displayName,
     description: (() => {
       if (hfModel._coreml) return `Core ML model from ${hfModel.repo}`;
-      const backendLabel = hfModel.backend === 'qnn' ? 'NPU' : 'GPU';
-      return `${backendLabel} model from ${hfModel.repo}`;
+      return `${imageBackendLabel(hfModel.backend, 'GPU')} model from ${hfModel.repo}`;
     })(),
     downloadUrl: hfModel.downloadUrl,
     size: hfModel.size,

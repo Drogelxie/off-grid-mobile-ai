@@ -263,5 +263,3 @@ export const RemoteServerModal: React.FC<RemoteServerModalProps> = ({
     </AppSheet>
   );
 };
-
-export default RemoteServerModal;

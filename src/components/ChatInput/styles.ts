@@ -1,10 +1,8 @@
 import type { ThemeColors, ThemeShadows } from '../../theme';
-import { FONTS } from '../../constants';
+import { FONTS, TYPOGRAPHY, SPACING } from '../../constants';
 import { Platform } from 'react-native';
 
 export const PILL_ICON_SIZE = 32;
-const NUM_PILL_ICONS = 2;
-export const PILL_ICONS_WIDTH = PILL_ICON_SIZE * NUM_PILL_ICONS;
 export const ANIM_DURATION_IN = 180;
 export const ANIM_DURATION_OUT = 200;
 const TOOL_WARNING_COLOR = '#F59E0B';
@@ -117,10 +115,10 @@ export const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden' as const,
-    paddingLeft: 14,
+    paddingLeft: 16,
     paddingRight: 4,
-    paddingVertical: 4,
-    minHeight: 48,
+    paddingVertical: 6,
+    minHeight: 56,
   },
   pillInput: {
     flex: 1,
@@ -133,6 +131,33 @@ export const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     paddingTop: Platform.OS === 'ios' ? 10 : 6,
     paddingBottom: Platform.OS === 'ios' ? 10 : 6,
     paddingRight: 4,
+  },
+  // Push-to-talk hint that replaces the text field while holding to record: a recording dot on the
+  // left, "‹ Slide to cancel" centred (the mic sits to the right, outside the pill).
+  recordingRow: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    minHeight: 36,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+    marginRight: SPACING.sm,
+  },
+  slideToCancel: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 2,
+  },
+  slideToCancelText: {
+    ...TYPOGRAPHY.body,
+    color: colors.textMuted,
+    fontFamily: FONTS.mono,
   },
   // Icons row inside pill (right side)
   pillIcons: {
@@ -204,6 +229,17 @@ export const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
   circleButtonStop: {
     backgroundColor: `${colors.error}`,
   },
+  // Stop control sized to match the audio-mode mic (AUDIO_MIC_SIZE), so the
+  // center slot keeps one footprint across mic / loading / stop — no layout jump
+  // when generation starts or playback runs.
+  circleButtonLarge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: colors.error,
+  },
   circleButtonIdle: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -220,5 +256,26 @@ export const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     fontFamily: FONTS.mono,
     fontWeight: '500' as const,
     color: colors.primary,
+  },
+  // Audio mode layout
+  audioModeRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: SPACING.md,
+    paddingVertical: 2, // tight — the mic already gives the row its height
+  },
+  // Voice cycle button — shows icon + voice name
+  audioVoiceButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    paddingHorizontal: SPACING.sm,
+    height: 32,
+    borderRadius: 16,
+  },
+  audioVoiceLabel: {
+    ...TYPOGRAPHY.meta,
+    color: colors.textSecondary,
   },
 });

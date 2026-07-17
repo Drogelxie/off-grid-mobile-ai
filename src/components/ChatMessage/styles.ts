@@ -22,6 +22,12 @@ const createBubbleStyles = (colors: ThemeColors) => ({
     color: colors.textMuted,
     textAlign: 'center' as const,
   },
+  // A tool-call reply's content column — matches the assistant bubble width (85%) + left alignment
+  // so the thinking box, pre-text, and tool cards line up with every other AI message.
+  toolCallReplyContent: {
+    width: '85%' as const,
+    alignSelf: 'flex-start' as const,
+  },
   toolCallPreText: {
     alignSelf: 'flex-start' as const,
     paddingBottom: 6,
@@ -76,8 +82,9 @@ const createBubbleStyles = (colors: ThemeColors) => ({
     minWidth: '85%' as const,
   },
   attachmentsContainer: {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
+    // Stack attachments vertically (voice note on top, image below) instead of side-by-side —
+    // a voice-note + image message rendered in a row looked broken (device 2026-07-14).
+    flexDirection: 'column' as const,
     gap: 4,
     marginBottom: 8,
   },
@@ -92,6 +99,22 @@ const createBubbleStyles = (colors: ThemeColors) => ({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
+  },
+  audioBadge: {
+    flexDirection: 'column' as const,
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: 8,
+    maxWidth: 260,
+  },
+  audioBadgeHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: SPACING.xs,
+  },
+  audioTranscription: {
+    ...TYPOGRAPHY.bodySmall,
   },
   documentBadgeUser: {
     backgroundColor: 'rgba(0, 0, 0, 0.15)',
@@ -173,6 +196,14 @@ const createThinkingStyles = (colors: ThemeColors) => ({
     marginBottom: 8,
     overflow: 'hidden' as const,
     width: '100%' as const,
+  },
+  /** Full-width ThinkingBlock when rendered outside a message bubble (e.g. ToolCallWithThinking).
+   *  Uses alignSelf:'stretch' (NOT a percentage width) because the parent systemInfoContainer
+   *  centers its children (alignItems:'center'); a percentage width + alignSelf there fails to
+   *  resolve on iOS and the COLLAPSED block falls back to content width — a tiny square with no
+   *  visible preview. Stretch fills the parent width in both collapsed and expanded states. */
+  thinkingBlockWrapper: {
+    alignSelf: 'stretch' as const,
   },
   thinkingHeader: {
     flexDirection: 'row' as const,
@@ -293,6 +324,28 @@ const createActionStyles = (colors: ThemeColors) => ({
   editSheetContent: {
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.xl,
+  },
+  selectTextContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.xl,
+  },
+  selectTextHint: {
+    ...TYPOGRAPHY.meta,
+    color: colors.textMuted,
+    marginBottom: SPACING.sm,
+  },
+  selectTextScroll: {
+    maxHeight: 360,
+    backgroundColor: colors.surface,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: SPACING.md,
+  },
+  selectTextBody: {
+    ...TYPOGRAPHY.body,
+    fontFamily: FONTS.mono,
+    color: colors.text,
   },
   editInput: {
     ...TYPOGRAPHY.body,

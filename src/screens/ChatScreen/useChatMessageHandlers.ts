@@ -1,8 +1,13 @@
 import { Dispatch, SetStateAction } from 'react';
 import { showAlert, AlertState } from '../../components';
 import { Message } from '../../types';
+import { callHook, HOOKS } from '../../bootstrap/hookRegistry';
+import logger from '../../utils/logger';
+import { modelResidencyManager } from '../../services/modelResidency';
+import { hardwareService } from '../../services/hardware';
 import {
   regenerateResponseFn, executeDeleteConversationFn, handleImageGenerationFn,
+  recordedTurnKind,
 } from './useChatGenerationActions';
 import type { GenerationDeps } from './useChatGenerationActions';
 
@@ -16,23 +21,54 @@ type RetryParams = {
   setDebugInfo: SetState<any>;
 };
 
+/** Shared context for the retry-branch helpers (bundled so each stays within the param limit). */
+type RetryCtx = { message: Message; genDeps: GenerationDeps; p: RetryParams; convId: string; msgs: Message[] };
+
+/** Retry from a USER message: read the turn's recorded modality BEFORE deleting the reply that
+ *  carries it, so resend re-runs the SAME pipeline (deterministic) instead of re-classifying. */
+async function retryFromUserMessage({ message, genDeps, p, convId, msgs }: RetryCtx): Promise<void> {
+  const idx = msgs.findIndex((m: Message) => m.id === message.id);
+  const recordedKind = recordedTurnKind(msgs, message.id);
+  logger.log(`[RESEND-SM] retry user msg idx=${idx} willDelete=${idx !== -1 && idx < msgs.length - 1} recordedKind=${recordedKind ?? 'none'}`);
+  if (idx !== -1 && idx < msgs.length - 1) p.deleteMessagesAfter(convId, message.id);
+  await regenerateResponseFn(genDeps, { setDebugInfo: p.setDebugInfo, userMessage: message, recordedKind });
+}
+
+/** Retry from an ASSISTANT message: regenerate the preceding user turn. Uses the SAME whole-turn
+ *  recordedTurnKind (keyed on that user message) as the user-message path, so tapping resend on
+ *  EITHER the enhanced-prompt or the image-result message of an image turn re-draws the image. */
+async function retryFromAssistantMessage({ message, genDeps, p, convId, msgs }: RetryCtx): Promise<void> {
+  const idx = msgs.findIndex((m: Message) => m.id === message.id);
+  const prev = idx > 0 ? msgs.slice(0, idx).reverse().find((m: Message) => m.role === 'user') ?? null : null;
+  const recordedKind = prev ? recordedTurnKind(msgs, prev.id) : undefined;
+  logger.log(`[RESEND-SM] retry assistant msg idx=${idx} prevUser=${prev?.id ?? 'none'} recordedKind=${recordedKind ?? 'none'}`);
+  if (prev) {
+    p.deleteMessagesAfter(convId, prev.id);
+    await regenerateResponseFn(genDeps, { setDebugInfo: p.setDebugInfo, userMessage: prev, recordedKind });
+  }
+}
+
 export async function handleRetryMessageFn(
   message: Message, genDeps: GenerationDeps, p: RetryParams,
 ): Promise<void> {
-  if (!p.activeConversationId || !p.hasActiveModel) return;
   const msgs = p.activeConversation?.messages || [];
-  if (message.role === 'user') {
-    const idx = msgs.findIndex((m: Message) => m.id === message.id);
-    if (idx !== -1 && idx < msgs.length - 1) p.deleteMessagesAfter(p.activeConversationId, message.id);
-    await regenerateResponseFn(genDeps, { setDebugInfo: p.setDebugInfo, userMessage: message });
-  } else {
-    const idx = msgs.findIndex((m: Message) => m.id === message.id);
-    const prev = idx > 0 ? msgs.slice(0, idx).reverse().find((m: Message) => m.role === 'user') : null;
-    if (prev) {
-      p.deleteMessagesAfter(p.activeConversationId, prev.id);
-      await regenerateResponseFn(genDeps, { setDebugInfo: p.setDebugInfo, userMessage: prev });
-    }
-  }
+  // Memory breakdown at the crash-prone moment: the JetsamEvent shows the app
+  // hitting the ~2GB per-process limit, but not WHAT's resident. Dump it so we see
+  // whether an un-evicted model (image?) or a leak is eating the budget.
+  try {
+    const residents = modelResidencyManager.getResidents().map(r => `${r.type}:${r.sizeMB}MB`).join(',');
+    logger.log(`[MEM-SM] resend: residents=[${residents}] availMB=${Math.round(hardwareService.getAvailableMemoryGB() * 1024)} totalMB=${Math.round(hardwareService.getTotalMemoryGB() * 1024)}`);
+  } catch { /* diagnostics only */ }
+  logger.log(`[RESEND-SM] retry msg role=${message.role} id=${message.id} hasActiveModel=${p.hasActiveModel} conv=${p.activeConversationId} totalMsgs=${msgs.length}`);
+  // No model loaded (e.g. user ejected all models): tell them, don't silently
+  // no-op. Mirrors the send path's "No Model Selected" alert (handleSendFn).
+  if (!p.hasActiveModel) { logger.log('[RESEND-SM] retry BAIL: no active model'); genDeps.setAlertState(showAlert('No Model Selected', 'Please select a model first.')); return; }
+  if (!p.activeConversationId) { logger.log('[RESEND-SM] retry BAIL: no conv'); return; }
+  // Stop any in-flight TTS before deleting messages (no-op without pro audio)
+  callHook(HOOKS.audioStop);
+  const ctx: RetryCtx = { message, genDeps, p, convId: p.activeConversationId, msgs };
+  if (message.role === 'user') await retryFromUserMessage(ctx);
+  else await retryFromAssistantMessage(ctx);
 }
 
 type EditParams = {
@@ -40,16 +76,22 @@ type EditParams = {
   newContent: string;
   activeConversationId: string | null | undefined;
   hasActiveModel: boolean;
+  activeConversation: any;
   updateMessageContent: (c: string, m: string, v: string) => void;
   deleteMessagesAfter: (c: string, m: string) => void;
   setDebugInfo: SetState<any>;
 };
 
 export async function handleEditMessageFn(genDeps: GenerationDeps, p: EditParams): Promise<void> {
-  if (!p.activeConversationId || !p.hasActiveModel) return;
+  // Same as retry: no model loaded → alert instead of a silent no-op.
+  if (!p.hasActiveModel) { genDeps.setAlertState(showAlert('No Model Selected', 'Please select a model first.')); return; }
+  if (!p.activeConversationId) return;
+  // Preserve the turn's modality across an edit: an edited image prompt re-runs the image pipeline
+  // (read BEFORE the update/delete strips the reply that records it), not a re-classification.
+  const recordedKind = recordedTurnKind(p.activeConversation?.messages || [], p.message.id);
   p.updateMessageContent(p.activeConversationId, p.message.id, p.newContent);
   p.deleteMessagesAfter(p.activeConversationId, p.message.id);
-  await regenerateResponseFn(genDeps, { setDebugInfo: p.setDebugInfo, userMessage: { ...p.message, content: p.newContent } });
+  await regenerateResponseFn(genDeps, { setDebugInfo: p.setDebugInfo, userMessage: { ...p.message, content: p.newContent }, recordedKind });
 }
 
 export function handleDeleteConversationFn(

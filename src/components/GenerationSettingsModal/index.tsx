@@ -10,6 +10,8 @@ import { createStyles } from './styles';
 import { ConversationActionsSection } from './ConversationActionsSection';
 import { ImageGenerationSection } from './ImageGenerationSection';
 import { TextGenerationSection } from './TextGenerationSection';
+import { getSlot, SLOTS } from '../../bootstrap/slotRegistry';
+import { SWEET_SPOT_SIZE, DEFAULT_IMAGE_GUIDANCE, DEFAULT_IMAGE_STEPS } from '../../utils/imageGenAdvice';
 
 const DEFAULT_SETTINGS = {
   temperature: 0.7,
@@ -19,6 +21,12 @@ const DEFAULT_SETTINGS = {
   contextLength: 4096,
   nThreads: 0,
   nBatch: 512,
+  // Reset the image params too, from the same single source the pipeline honors — a
+  // reset previously left a custom image size/guidance untouched (Q12).
+  imageWidth: SWEET_SPOT_SIZE,
+  imageHeight: SWEET_SPOT_SIZE,
+  imageGuidanceScale: DEFAULT_IMAGE_GUIDANCE,
+  imageSteps: DEFAULT_IMAGE_STEPS,
 };
 
 interface GenerationSettingsModalProps {
@@ -27,6 +35,7 @@ interface GenerationSettingsModalProps {
   onOpenProject?: () => void;
   onOpenGallery?: () => void;
   onDeleteConversation?: () => void;
+  onOpenTTSSettings?: () => void;
   conversationImageCount?: number;
   activeProjectName?: string | null;
   isRemote?: boolean;
@@ -38,6 +47,7 @@ export const GenerationSettingsModal: React.FC<GenerationSettingsModalProps> = (
   onOpenProject,
   onOpenGallery,
   onDeleteConversation,
+  onOpenTTSSettings,
   conversationImageCount = 0,
   activeProjectName,
   isRemote,
@@ -50,6 +60,10 @@ export const GenerationSettingsModal: React.FC<GenerationSettingsModalProps> = (
   const [performanceStats, setPerformanceStats] = useState(llmService.getPerformanceStats());
   const [imageSettingsOpen, setImageSettingsOpen] = useState(false);
   const [textSettingsOpen, setTextSettingsOpen] = useState(false);
+  const [ttsSettingsOpen, setTtsSettingsOpen] = useState(false);
+  // TTS settings come from the pro audio feature via a slot. Free builds have
+  // no TTS section.
+  const TtsSection = getSlot(SLOTS.generationSettingsTts);
 
   useEffect(() => {
     if (visible) {
@@ -141,6 +155,27 @@ export const GenerationSettingsModal: React.FC<GenerationSettingsModalProps> = (
               </View>
             )}
             <TextGenerationSection />
+          </>
+        )}
+
+        {/* TTS SETTINGS (pro audio feature) */}
+        {TtsSection && (
+          <>
+            <TouchableOpacity
+              style={styles.accordionHeader}
+              onPress={() => setTtsSettingsOpen(!ttsSettingsOpen)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.accordionTitle}>TEXT TO SPEECH</Text>
+              <Icon
+                name={ttsSettingsOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={colors.textMuted}
+              />
+            </TouchableOpacity>
+            {ttsSettingsOpen && (
+              <TtsSection onNavigateToTTSSettings={onOpenTTSSettings} />
+            )}
           </>
         )}
 

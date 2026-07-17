@@ -7,9 +7,9 @@ import { pick, types, isErrorWithCode, errorCodes } from '@react-native-document
 import { showAlert, AlertState, initialAlertState } from '../../components/CustomAlert';
 import { useFocusTrigger } from '../../hooks/useFocusTrigger';
 import { useAppStore } from '../../stores';
-import { useDownloadStore, isActiveStatus } from '../../stores/downloadStore';
+import { useDownloadStore, isActiveStatus, isFailedStatus } from '../../stores/downloadStore';
 import { modelManager } from '../../services';
-import { liteRTService } from '../../services/litert';
+import { isLiteRTAvailable } from '../../services/engines';
 import { resolveCoreMLModelDir } from '../../utils/coreMLModelUtils';
 import { ONNXImageModel } from '../../types';
 import { ModelTab, NavigationProp } from './types';
@@ -116,7 +116,7 @@ export function useModelsScreen() {
 
   const validateImportFiles = (resolvedFiles: Array<{ name: string; uri: string }>): string | null => {
     const singleLitert = resolvedFiles.length === 1 && resolvedFiles[0].name.toLowerCase().endsWith('.litertlm');
-    if (singleLitert && !liteRTService.isAvailable()) {
+    if (singleLitert && !isLiteRTAvailable()) {
       return 'litert_unsupported';
     }
     const allGguf = resolvedFiles.every(f => f.name.toLowerCase().endsWith('.gguf'));
@@ -192,45 +192,35 @@ export function useModelsScreen() {
       d => isActiveStatus(d.status),
     ).length,
   );
+  // The icon badge answers "is there download work outstanding?" — so it counts active AND
+  // failed/retriable (a failed download needs a retry or remove and must not be invisible).
+  const downloadBadgeCount = useDownloadStore(state =>
+    Object.values(state.downloads).filter(
+      d => isActiveStatus(d.status) || isFailedStatus(d.status),
+    ).length,
+  );
   const totalModelCount =
     text.downloadedModels.length +
     image.downloadedImageModels.length +
     activeDownloadCount;
 
+  // No caller-side "too many downloads" gate: backgroundDownloadService caps real
+  // concurrency at MAX_CONCURRENT_DOWNLOADS and FIFO-queues the rest, so extra starts
+  // just queue (shown as "Queued") instead of hurting performance. The old
+  // "Starting more can affect performance / Start Anyway" alert was obsolete friction
+  // (and its threshold of 2 didn't even match the cap of 3).
   const handleDownload = useCallback(
     (...args: Parameters<typeof text.handleDownload>) => {
-      if (activeDownloadCount >= 2) {
-        setAlertState(showAlert(
-          'Downloads Already Active',
-          '2 downloads are already running. Starting more can affect performance.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Start Anyway', style: 'default', onPress: () => { text.handleDownload(...args); } },
-          ],
-        ));
-        return;
-      }
       text.handleDownload(...args);
     },
-    [text, activeDownloadCount, setAlertState],
+    [text],
   );
 
   const handleDownloadImageModel = useCallback(
     (...args: Parameters<typeof image.handleDownloadImageModel>) => {
-      if (activeDownloadCount >= 2) {
-        setAlertState(showAlert(
-          'Downloads Already Active',
-          '2 downloads are already running. Starting more can affect performance.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Start Anyway', style: 'default', onPress: () => { image.handleDownloadImageModel(...args); } },
-          ],
-        ));
-        return;
-      }
       image.handleDownloadImageModel(...args);
     },
-    [image, activeDownloadCount, setAlertState],
+    [image],
   );
 
   return {
@@ -244,6 +234,7 @@ export function useModelsScreen() {
     importProgress,
     totalModelCount,
     activeDownloadCount,
+    downloadBadgeCount,
     handleImportLocalModel,
     handleRefresh,
     // text model state & handlers

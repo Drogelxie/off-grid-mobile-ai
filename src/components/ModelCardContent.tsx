@@ -18,11 +18,26 @@ interface CredibilityInfo {
 
 export interface RecommendedConfig {
   pillLabel?: string;
+  /** An extra descriptive line for a curated/recommended model (e.g. "Up to 2x
+   *  faster than CPU via GPU"). Rendered as part of the SAME common description
+   *  line as every other card — not a separately coloured/positioned highlight. */
   highlightText?: string;
   // When provided, replaces the default modelType/paramCount/RAM chips in
   // compact mode. Lets curated entries surface custom badges (e.g. "Vision",
   // "GPU") instead of the auto-derived ones.
   chips?: string[];
+}
+
+/**
+ * The ONE description string a card shows: the model's description plus any
+ * recommended highlight line, deduped (a curated entry whose description IS its
+ * highlight must not print twice) and joined. Rendered identically on every card
+ * in the common muted description slot — no special-case colour or position.
+ */
+function cardDescription(description?: string, highlightText?: string): string | undefined {
+  const parts = [description, highlightText].filter((v): v is string => !!v);
+  const unique = parts.filter((v, i) => parts.indexOf(v) === i);
+  return unique.length ? unique.join(' ') : undefined;
 }
 
 interface CompactModelCardContentProps {
@@ -39,6 +54,8 @@ interface CompactModelCardContentProps {
   credibilityInfo: CredibilityInfo | null;
   isTrending?: boolean;
   recommended?: RecommendedConfig;
+  /** Model can run on the GPU/NPU (LiteRT or Q4_0/Q8_0 GGUF) → show the badge. */
+  supportsAcceleration?: boolean;
 }
 
 function formatNumber(num: number): string {
@@ -79,9 +96,11 @@ export const CompactModelCardContent: React.FC<CompactModelCardContentProps> = (
   credibilityInfo,
   isTrending,
   recommended,
+  supportsAcceleration,
 }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const description = cardDescription(model.description, recommended?.highlightText);
 
   return (
     <>
@@ -116,9 +135,11 @@ export const CompactModelCardContent: React.FC<CompactModelCardContentProps> = (
           </View>
         )}
       </View>
-      {model.description && !recommended?.highlightText && (
-        <Text style={styles.descriptionCompact} numberOfLines={1}>
-          {model.description}
+      {/* One common description line for EVERY compact card: model description +
+          any recommended highlight, same slot (under the name), same muted style. */}
+      {!!description && (
+        <Text style={styles.descriptionCompact} numberOfLines={2}>
+          {description}
         </Text>
       )}
       {recommended?.chips && recommended.chips.length > 0 ? (
@@ -129,8 +150,15 @@ export const CompactModelCardContent: React.FC<CompactModelCardContentProps> = (
             </View>
           ))}
         </View>
-      ) : (model.modelType || model.paramCount) && (
+      ) : (model.modelType || model.paramCount || supportsAcceleration) && (
         <View style={[styles.infoRow, styles.infoRowCompact]}>
+          {/* Capability badge: this model can run on the GPU/NPU (a LiteRT model or a
+              Q4_0/Q8_0 GGUF). K-quants silently fall back to CPU, so they get no badge. */}
+          {supportsAcceleration && (
+            <View style={styles.accelBadge} testID="npu-gpu-badge">
+              <Text style={styles.accelBadgeText}>NPU/GPU</Text>
+            </View>
+          )}
           {model.modelType && (
             <View style={[styles.infoBadge, modelTypeBadgeStyle(styles, model.modelType)]}>
               <Text style={[styles.infoText, modelTypeTextStyle(styles, model.modelType)]}>
@@ -150,9 +178,6 @@ export const CompactModelCardContent: React.FC<CompactModelCardContentProps> = (
           )}
         </View>
       )}
-      {recommended?.highlightText && (
-        <Text style={styles.recommendedHighlightCompact}>{recommended.highlightText}</Text>
-      )}
     </>
   );
 };
@@ -169,6 +194,8 @@ interface StandardModelCardContentProps {
   credibilityInfo: CredibilityInfo | null;
   isActive?: boolean;
   recommended?: RecommendedConfig;
+  /** Model can run on the GPU/NPU (LiteRT or Q4_0/Q8_0 GGUF) → show the badge. */
+  supportsAcceleration?: boolean;
 }
 
 export const StandardModelCardContent: React.FC<StandardModelCardContentProps> = ({
@@ -177,9 +204,11 @@ export const StandardModelCardContent: React.FC<StandardModelCardContentProps> =
   credibilityInfo,
   isActive,
   recommended,
+  supportsAcceleration,
 }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const description = cardDescription(model.description, recommended?.highlightText);
 
   return (
     <>
@@ -217,14 +246,17 @@ export const StandardModelCardContent: React.FC<StandardModelCardContentProps> =
             </View>
           </>
         )}
+        {/* GPU/NPU capability badge — a LiteRT or Q4_0/Q8_0 quant this device can accelerate. */}
+        {supportsAcceleration && (
+          <View style={styles.accelBadge} testID="npu-gpu-badge">
+            <Text style={styles.accelBadgeText}>NPU/GPU</Text>
+          </View>
+        )}
       </View>
-      {model.description && (
+      {!!description && (
         <Text style={styles.description} numberOfLines={2}>
-          {model.description}
+          {description}
         </Text>
-      )}
-      {recommended?.highlightText && (
-        <Text style={styles.recommendedHighlight}>{recommended.highlightText}</Text>
       )}
     </>
   );
@@ -358,7 +390,7 @@ function DownloadedActions({ isActive, testID, colors, styles, onSelect, onDelet
   onSelect?: () => void; onDelete?: () => void; onRepairVision?: () => void; isRepairingVision?: boolean;
 }>) {
   const tid = (s: string) => testID ? `${testID}-${s}` : undefined;
-  if (!onSelect && !onDelete && !onRepairVision) return <Icon name="check-circle" size={16} color={colors.primary} />;
+  if (!onSelect && !onDelete && !onRepairVision) return <Icon name="check-circle" size={16} color={colors.primary} testID={tid('downloaded')} />;
   return (
     <>
       {isRepairingVision ? (
@@ -366,7 +398,7 @@ function DownloadedActions({ isActive, testID, colors, styles, onSelect, onDelet
           <ActivityIndicator size="small" color={colors.warning} />
         </View>
       ) : (
-        onRepairVision && <ActionButton icon="eye" color={colors.warning} haptic="impactLight" onPress={onRepairVision} testID={tid('repair-vision')} styles={styles} />
+        onRepairVision && <ActionButton icon="tool" color={colors.warning} haptic="impactLight" onPress={onRepairVision} testID={tid('repair-vision')} styles={styles} />
       )}
       {!isActive && onSelect && <ActionButton icon="check-circle" color={colors.primary} haptic="selection" onPress={onSelect} styles={styles} />}
       {onDelete && <ActionButton icon="trash-2" color={colors.error} haptic="notificationWarning" onPress={onDelete} styles={styles} />}

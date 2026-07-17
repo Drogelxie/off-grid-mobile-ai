@@ -1,6 +1,9 @@
 import React from 'react';
 import { ChatMessage } from '../../components';
+import { prepareMessageForSpeech } from '../../utils/messageContent';
 import { Message } from '../../types';
+import { useUiModeStore } from '../../stores';
+import { getSlot, SLOTS } from '../../bootstrap/slotRegistry';
 import { ChatMessageItem } from './useChatScreen';
 
 type MessageRendererProps = {
@@ -19,31 +22,97 @@ type MessageRendererProps = {
   onImagePress: (uri: string) => void;
 };
 
-export const MessageRenderer: React.FC<MessageRendererProps> = ({
-  item,
-  index,
-  displayMessagesLength,
-  animateLastN,
-  imageModelLoaded,
-  isStreaming,
-  isGeneratingImage,
-  showGenerationDetails,
-  onCopy,
-  onRetry,
-  onEdit,
-  onGenerateImage,
-  onImagePress,
-}) => (
-  <ChatMessage
-    message={item as Message}
-    isStreaming={item.id === 'streaming'}
-    onCopy={onCopy}
-    onRetry={onRetry}
-    onEdit={onEdit}
-    onGenerateImage={onGenerateImage}
-    onImagePress={onImagePress}
-    canGenerateImage={imageModelLoaded && !isStreaming && !isGeneratingImage}
-    showGenerationDetails={showGenerationDetails}
-    animateEntry={animateLastN > 0 && index >= displayMessagesLength - animateLastN}
-  />
-);
+const MessageRendererInner: React.FC<MessageRendererProps> = (props) => {
+  const {
+    item,
+    index,
+    displayMessagesLength,
+    animateLastN,
+    imageModelLoaded,
+    isStreaming,
+    isGeneratingImage,
+    showGenerationDetails,
+    onCopy,
+    onRetry,
+    onEdit,
+    onGenerateImage,
+    onImagePress,
+  } = props;
+
+  const interfaceMode = useUiModeStore((s) => s.interfaceMode);
+  const msg = item as Message;
+  const animateEntry = animateLastN > 0 && index >= displayMessagesLength - animateLastN;
+  const isStreamingThis = item.id === 'streaming';
+
+  // Audio mode: the pro audio feature owns the whole message presentation
+  // (user/assistant bubbles, thinking, streaming). Free builds never reach
+  // this branch (interfaceMode stays 'chat').
+  const AudioMessage = getSlot(SLOTS.messageAudioMode);
+  if (interfaceMode === 'audio' && AudioMessage) {
+    return (
+      <AudioMessage
+        msg={msg}
+        isStreamingThis={isStreamingThis}
+        shouldAnimate={animateEntry}
+        showGenerationDetails={showGenerationDetails}
+        onCopy={onCopy}
+        onRetry={onRetry}
+        onEdit={onEdit}
+        onGenerateImage={onGenerateImage}
+        onImagePress={onImagePress}
+      />
+    );
+  }
+
+  // Chat Mode: the speak button (pro slot) lives in the meta row.
+  const Speak = getSlot(SLOTS.messageSpeakButton);
+  const isPlainAssistant = msg.role === 'assistant' && !msg.isSystemInfo && !msg.toolCalls?.length;
+  // No speaker on an in-progress reply (streaming, or the thinking/loading dots).
+  const ttsMeta =
+    isPlainAssistant && !isStreamingThis && !(msg as Message).isThinking && Speak
+      ? <Speak text={prepareMessageForSpeech(msg.content)} messageId={msg.id} />
+      : undefined;
+
+  return (
+    <ChatMessage
+      message={msg}
+      isStreaming={isStreamingThis}
+      onCopy={onCopy}
+      onRetry={onRetry}
+      onEdit={onEdit}
+      onGenerateImage={onGenerateImage}
+      onImagePress={onImagePress}
+      canGenerateImage={imageModelLoaded && !isStreaming && !isGeneratingImage}
+      showGenerationDetails={showGenerationDetails}
+      animateEntry={animateEntry}
+      metaExtra={ttsMeta}
+    />
+  );
+};
+
+/**
+ * Memoized so a ChatScreen re-render (a streaming token, a focus after returning from
+ * the document picker, a keyboard event, any unrelated store tick) does NOT re-render
+ * and re-parse the markdown of every message — the cause of the chat-screen freeze
+ * (unresponsive until you leave + re-enter). getDisplayMessages returns
+ * [...allMessages, streamingItem], so the historical message objects keep stable refs
+ * across renders; only the 'streaming'/'thinking' item is a new object per token, so
+ * only IT re-renders while the rest skip.
+ *
+ * The on* callbacks are recreated every parent render (defined inline in useChatScreen)
+ * and are deliberately NOT compared: within a conversation they are behaviorally stable,
+ * and a conversation switch replaces every message object (item ref changes → re-render
+ * with fresh handlers). Comparing them would defeat the memo entirely.
+ */
+export function messageRendererPropsEqual(prev: MessageRendererProps, next: MessageRendererProps): boolean {
+  return prev.item === next.item
+    && prev.index === next.index
+    && prev.displayMessagesLength === next.displayMessagesLength
+    && prev.animateLastN === next.animateLastN
+    && prev.imageModelLoaded === next.imageModelLoaded
+    && prev.isStreaming === next.isStreaming
+    && prev.isGeneratingImage === next.isGeneratingImage
+    && prev.showGenerationDetails === next.showGenerationDetails;
+}
+
+export const MessageRenderer = React.memo(MessageRendererInner, messageRendererPropsEqual);

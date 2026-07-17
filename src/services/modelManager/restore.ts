@@ -105,7 +105,11 @@ interface RestoreEntryOpts {
 }
 
 function buildMetadataFromActiveDownload(download: RestorableDownloadInfo, modelsDir: string): PersistedDownloadInfo | null {
-  if (!download.modelId || download.modelId.startsWith('image:')) return null;
+  // image: (image models) and whisper- (STT models) are owned by their own
+  // managers, not the text model manager. Recovering them here registered them
+  // as text models, so they showed up under Text in the model selector and the
+  // Download Manager's downloaded list.
+  if (!download.modelId || download.modelId.startsWith('image:') || download.modelId.startsWith('whisper-')) return null;
   const mainFileSize = download.totalBytes;
   const combinedTotal = download.combinedTotalBytes || download.totalBytes;
   const mmProjFileSize = Math.max(combinedTotal - mainFileSize, 0);
@@ -241,6 +245,13 @@ export async function restoreInProgressDownloads(opts: RestoreDownloadsOpts): Pr
   });
   const mmProjIds = collectMmProjIds(persistedDownloads, activeDownloads);
   const restoredDownloadIds: string[] = [];
+  // Only genuinely in-flight downloads occupy a native concurrency slot and will emit
+  // a terminal event to release it. A restored row that already 'completed' (finished
+  // while the app was killed) must NOT be adopted — it never fires DownloadComplete
+  // again, so its slot would leak forever and eventually starve the queue.
+  const adoptableIds: string[] = [];
+  const isInFlight = (s?: string) =>
+    s === 'running' || s === 'pending' || s === 'retrying' || s === 'waiting_for_network';
 
   for (const download of activeDownloads) {
     if (!isRestorable(download)) continue;
@@ -260,6 +271,7 @@ export async function restoreInProgressDownloads(opts: RestoreDownloadsOpts): Pr
         backgroundDownloadContext, backgroundDownloadMetadataCallback, onProgress,
       });
       restoredDownloadIds.push(download.downloadId);
+      if (isInFlight(download.status)) adoptableIds.push(download.downloadId);
     } catch (error) {
       // Keep restoring other downloads even if one stale native row is malformed.
       logger.error('[ModelManager] Failed to restore in-progress download', {
@@ -270,6 +282,11 @@ export async function restoreInProgressDownloads(opts: RestoreDownloadsOpts): Pr
       });
     }
   }
+
+  // Count only the still-running resumed downloads against the concurrency cap (a
+  // completed one holds no slot and would never release). Their terminal events free
+  // the slots so a fresh batch isn't admitted on top of them.
+  backgroundDownloadService.adoptActive(adoptableIds);
 
   return restoredDownloadIds;
 }

@@ -1,5 +1,3 @@
-// Model category types
-export type ModelCategory = 'text-generation' | 'image-generation' | 'vision' | 'code';
 // Model source and credibility types
 export type ModelSource = 'lmstudio' | 'official' | 'verified-quantizer' | 'community';
 
@@ -44,6 +42,9 @@ export interface ModelFile {
   // Unset for non-LiteRT files and for LiteRT files imported locally where the
   // capability is unknown.
   liteRTVision?: boolean;
+  // LiteRT-specific: whether this .litertlm file accepts audio input directly
+  // (e.g. Gemma 4 E2B/E4B). Same plumbing as liteRTVision.
+  liteRTAudio?: boolean;
 }
 
 export type ModelEngine = 'llama' | 'litert';
@@ -71,13 +72,12 @@ export interface LlamaDownloadedModel extends DownloadedModelBase {
 export interface LiteRTDownloadedModel extends DownloadedModelBase {
   engine: 'litert';
   liteRTVision: boolean;
+  // Whether this model accepts audio input directly (no Whisper STT needed).
+  // Optional: absent for locally-imported models where capability is unknown.
+  liteRTAudio?: boolean;
 }
 
 export type DownloadedModel = LlamaDownloadedModel | LiteRTDownloadedModel;
-
-export function isLlamaModel(m: DownloadedModel): m is LlamaDownloadedModel {
-  return m.engine === 'llama';
-}
 
 export function isLiteRTModel(m: DownloadedModel): m is LiteRTDownloadedModel {
   return m.engine === 'litert';
@@ -153,16 +153,16 @@ export interface ModelRecommendation {
 // Media attachment types
 export interface MediaAttachment {
   id: string;
-  type: 'image' | 'document';
+  type: 'image' | 'document' | 'audio';
   uri: string;
   mimeType?: string;
   width?: number;
   height?: number;
   fileName?: string;
-  /** For documents: the extracted text content */
-  textContent?: string;
-  /** For documents: file size in bytes */
-  fileSize?: number;
+  textContent?: string; // documents: extracted text
+  fileSize?: number; // documents: file size in bytes
+  audioFormat?: 'wav' | 'mp3'; // audio attachments: format for model input
+  audioDurationSeconds?: number; // audio attachments: recorded duration in seconds
 }
 
 // Generation metadata - details about how a message was generated
@@ -194,6 +194,10 @@ export interface GenerationMeta {
   /** Image resolution */
   resolution?: string;
   cacheType?: string; // KV cache quantization type
+  /** Tool names sent to the model for this turn (built-in + routed MCP/ext tools). */
+  routedToolNames?: string[];
+  /** True when the reply was cut off at the n_predict cap without an EOS token (B15). */
+  truncated?: boolean;
 }
 
 // Chat-related types
@@ -219,6 +223,16 @@ export interface Message {
   toolCalls?: Array<{ id?: string; name: string; arguments: string }>;
   /** Tool name (for tool result messages) */
   toolName?: string;
+  /** True when this assistant message was generated while interfaceMode === 'audio' */
+  isAudioModeMessage?: boolean;
+  /** Audio-mode message payload (saved voice note / synthesized clip): the on-disk audio
+   *  file path, a precomputed waveform envelope, and the clip duration. Read by the pro
+   *  audio UI (MessageAudioMode / AudioMessageBubble) and set by the TTS save path.
+   *  Optional — only audio-mode messages carry them. (Distinct from the same-named field
+   *  on MediaAttachment above, which describes an inbound audio attachment.) */
+  audioPath?: string;
+  waveformData?: number[];
+  audioDurationSeconds?: number;
 }
 
 export interface Conversation {
@@ -233,13 +247,6 @@ export interface Conversation {
   compactionCutoffMessageId?: string;
 }
 
-// Onboarding-related types
-export interface OnboardingStep {
-  id: string;
-  title: string;
-  description: string;
-  image?: string;
-}
 
 // Hugging Face API types
 export interface HFModelSearchResult {
@@ -263,7 +270,7 @@ export interface HFModelSearchResult {
   siblings?: HFModelFile[];
 }
 
-export interface HFModelFile {
+interface HFModelFile {
   rfilename: string;
   size?: number;
   blobId?: string;
@@ -274,19 +281,6 @@ export interface HFModelFile {
   };
 }
 
-// Image generation types
-export interface ImageGenerationModel {
-  id: string;
-  name: string;
-  author: string;
-  description: string;
-  downloads: number;
-  likes: number;
-  modelPath: string;
-  downloadedAt: string;
-  size: number;
-  variant?: string; // e.g., 'gpu', 'npu', 'cpu'
-}
 
 export interface ONNXImageModel {
   id: string;
@@ -300,18 +294,13 @@ export interface ONNXImageModel {
   attentionVariant?: 'split_einsum' | 'original';
 }
 
-// Image generation state for UI
-export interface ImageGenerationState {
-  isGenerating: boolean;
-  currentStep: number;
-  totalSteps: number;
-  progress: number;
-  prompt?: string;
-}
+// NOTE: the authoritative ImageGenerationState lives in
+// services/imageGenerationService.ts (phase-derived) and is re-exported from
+// services/index.ts. The duplicate that used to sit here was imported by nobody
+// (every consumer takes the service's version) — removed to kill the drift risk.
 
 export type ImageGenerationMode = 'auto' | 'manual';
 export type AutoDetectMethod = 'pattern' | 'llm';
-export type ModelLoadingStrategy = 'performance' | 'memory';
 export type CacheType = 'f16' | 'q8_0' | 'q4_0';
 export type InferenceBackend = 'cpu' | 'opencl' | 'htp' | 'metal';
 export type LiteRTBackend = 'cpu' | 'gpu' | 'npu';
@@ -409,7 +398,6 @@ export interface DebugInfo {
   formattedPrompt: string; estimatedTokens: number;
   maxContextLength: number; contextUsagePercent: number;
 }
-export type AppScreen = 'onboarding' | 'home' | 'models' | 'chat' | 'settings' | 'generate' | 'model-download';
 // Remote server types
-export type { RemoteProviderType, RemoteServer, RemoteModel, RemoteModelCapabilities, ServerTestResult, ServerInfo, RemoteGenerationSettings, SelectableModel } from './remoteServer';
-export { DEFAULT_REMOTE_GENERATION_SETTINGS } from './remoteServer';
+export type { RemoteServer, RemoteModel, ServerTestResult } from './remoteServer';
+;

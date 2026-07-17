@@ -57,6 +57,14 @@ yarn-error.log
 **/fastlane/screenshots
 **/fastlane/test_output
 
+# fastlane credentials — never commit store keys or local env
+fastlane/.env
+fastlane/play-store-key.json
+fastlane/asc-api-key.json
+fastlane/*.p8
+# but DO commit the template (overrides the global .env.* rule above)
+!fastlane/.env.example
+
 # Bundle artifact
 *.jsbundle
 
@@ -78,3 +86,11 @@ yarn-error.log
 !.yarn/sdks
 !.yarn/versions
 docs/TRACTION_KNOWLEDGE_BASE.md
+# Local marketing drafts (not part of the app)
+marketing/
+
+# Personal device-test commentary (raw voice, not for the repo)
+docs/DEVICE_SESSION_COMMENTARY.md
+
+# Device wire-capture logs (raw, large, session-specific — kept locally, not versioned)
+docs/wire-captures/

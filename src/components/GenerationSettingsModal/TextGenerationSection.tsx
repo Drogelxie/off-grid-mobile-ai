@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import Slider from '@react-native-community/slider';
+import { View } from 'react-native';
+import { SliderSetting } from '../SliderSetting';
 import { AdvancedToggle } from '../AdvancedToggle';
-import { useTheme, useThemedStyles } from '../../theme';
+import { useThemedStyles } from '../../theme';
 import { useAppStore, selectIsLiteRT } from '../../stores';
 import { hardwareService } from '../../services';
 import { createStyles } from './styles';
@@ -13,7 +13,8 @@ import {
   LiteRTBackendSelector,
   FlashAttentionToggle,
   KvCacheTypeToggle,
-  ModelLoadingStrategyToggle,
+  ModelLoadingModeSelector,
+  ShowGenerationDetailsToggle,
 } from './TextGenerationAdvanced';
 
 interface SettingConfig {
@@ -119,76 +120,24 @@ function buildLiteRTConfig(modelMaxContext: number | null = null): SettingConfig
 // ─── Shared slider component ──────────────────────────────────────────────────
 
 const SettingSlider: React.FC<{ config: SettingConfig }> = ({ config }) => {
-  const { colors } = useTheme();
-  const styles = useThemedStyles(createStyles);
   const { settings, updateSettings } = useAppStore();
   const rawValue = (settings as Record<string, unknown>)[config.key];
   const value = (rawValue ?? DEFAULT_SETTINGS[config.key]) as number;
-  const warningText = config.warning?.(value) ?? null;
-  const warningColor = config.warningColor ?? colors.error;
 
   return (
-    <View style={styles.settingGroup}>
-      <View style={styles.settingHeader}>
-        <Text style={styles.settingLabel}>{config.label}</Text>
-        <Text style={styles.settingValue}>{config.format(value)}</Text>
-      </View>
-      {config.description && (
-        <Text style={styles.settingDescription}>{config.description}</Text>
-      )}
-      {warningText && (
-        <Text style={[styles.settingDescription, { color: warningColor }]}>{warningText}</Text>
-      )}
-      <Slider
-        style={styles.slider}
-        minimumValue={config.min}
-        maximumValue={config.max}
-        step={config.step}
-        value={value}
-        onValueChange={(v) => updateSettings({ [config.key]: v })}
-        onSlidingComplete={() => {}}
-        minimumTrackTintColor={colors.primary}
-        maximumTrackTintColor={colors.surfaceLight}
-        thumbTintColor={colors.primary}
-      />
-      <View style={styles.sliderLabels}>
-        <Text style={styles.sliderMinMax}>{config.format(config.min)}</Text>
-        <Text style={styles.sliderMinMax}>{config.format(config.max)}</Text>
-      </View>
-    </View>
-  );
-};
-
-// ─── Show Generation Details ──────────────────────────────────────────────────
-
-const ShowGenerationDetailsToggle: React.FC = () => {
-  const styles = useThemedStyles(createStyles);
-  const { settings, updateSettings } = useAppStore();
-  const isOn = settings.showGenerationDetails;
-
-  return (
-    <View style={styles.modeToggleContainer}>
-      <View style={styles.modeToggleInfo}>
-        <Text style={styles.modeToggleLabel}>Show Generation Details</Text>
-        <Text style={styles.modeToggleDesc}>
-          Display GPU, model, tok/s, and image settings below each message
-        </Text>
-      </View>
-      <View style={styles.modeToggleButtons}>
-        <TouchableOpacity
-          style={[styles.modeButton, !isOn && styles.modeButtonActive]}
-          onPress={() => updateSettings({ showGenerationDetails: false })}
-        >
-          <Text style={[styles.modeButtonText, !isOn && styles.modeButtonTextActive]}>Off</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.modeButton, isOn && styles.modeButtonActive]}
-          onPress={() => updateSettings({ showGenerationDetails: true })}
-        >
-          <Text style={[styles.modeButtonText, isOn && styles.modeButtonTextActive]}>On</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    <SliderSetting
+      testID={`setting-${config.key}`}
+      label={config.label}
+      value={value}
+      min={config.min}
+      max={config.max}
+      step={config.step}
+      formatValue={config.format}
+      description={config.description}
+      warning={config.warning?.(value) ?? null}
+      warningColor={config.warningColor}
+      onChange={(v) => updateSettings({ [config.key]: v })}
+    />
   );
 };
 
@@ -221,6 +170,7 @@ const LiteRTTextGenerationSection: React.FC = () => {
             <SettingSlider key={c.key} config={c} />
           ))}
           <LiteRTBackendSelector />
+          <ModelLoadingModeSelector />
         </>
       )}
     </View>
@@ -260,7 +210,7 @@ const LlamaTextGenerationSection: React.FC = () => {
           <BackendSelector />
           <FlashAttentionToggle />
           <KvCacheTypeToggle />
-          <ModelLoadingStrategyToggle />
+          <ModelLoadingModeSelector />
         </>
       )}
     </View>

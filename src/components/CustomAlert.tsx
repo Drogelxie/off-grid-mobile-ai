@@ -10,11 +10,14 @@ import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
 import { SPACING, TYPOGRAPHY } from '../constants';
 
-export interface AlertButton {
-  text: string;
-  style?: 'default' | 'cancel' | 'destructive';
-  onPress?: () => void;
-}
+// AlertState + its factories are pure and live in utils/alertState so non-UI code can build an
+// alert state without importing this component (no-backward-layering-core). Re-exported here so
+// existing `from '../components/CustomAlert'` importers are unchanged.
+import { AlertButton } from '../utils/alertState';
+
+export type { AlertButton };
+export type { AlertState } from '../utils/alertState';
+export { initialAlertState, showAlert, hideAlert } from '../utils/alertState';
 
 export interface CustomAlertProps {
   visible: boolean;
@@ -24,6 +27,7 @@ export interface CustomAlertProps {
   onClose?: () => void;
   loading?: boolean;
   closeLabel?: string;
+  prominentMessage?: boolean;
 }
 
 export const CustomAlert: React.FC<CustomAlertProps> = ({
@@ -34,6 +38,7 @@ export const CustomAlert: React.FC<CustomAlertProps> = ({
   onClose,
   loading = false,
   closeLabel = 'Done',
+  prominentMessage = false,
 }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -55,7 +60,7 @@ export const CustomAlert: React.FC<CustomAlertProps> = ({
         {loading ? (
           <ActivityIndicator size="small" color={colors.primary} style={styles.loadingIndicator} />
         ) : null}
-        {message ? <Text style={styles.message}>{message}</Text> : null}
+        {message ? <Text style={[styles.message, prominentMessage && styles.messageProminent]}>{message}</Text> : null}
         <View style={styles.buttonContainer}>
           {buttons.map((button, index) => (
             <TouchableOpacity
@@ -84,51 +89,6 @@ export const CustomAlert: React.FC<CustomAlertProps> = ({
 };
 
 // Hook for managing alert state
-export interface AlertState {
-  visible: boolean;
-  title: string;
-  message?: string;
-  buttons?: AlertButton[];
-  loading?: boolean;
-  closeLabel?: string;
-}
-
-export const initialAlertState: AlertState = {
-  visible: false,
-  title: '',
-  message: undefined,
-  buttons: undefined,
-  loading: false,
-};
-
-// Helper function to show alert (returns state to set)
-export const showAlert = (
-  title: string,
-  message?: string,
-  buttons?: AlertButton[],
-): AlertState => ({
-  visible: true,
-  title,
-  message,
-  buttons,
-  loading: false,
-});
-
-// Helper function to show loading alert (returns state to set)
-export const showLoadingAlert = (
-  title: string,
-  message?: string,
-  buttons?: AlertButton[],
-): AlertState => ({
-  visible: true,
-  title,
-  message,
-  buttons,
-  loading: true,
-});
-
-// Helper function to hide alert (returns state to set)
-export const hideAlert = (): AlertState => initialAlertState;
 
 const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
   content: {
@@ -146,6 +106,11 @@ const createStyles = (colors: ThemeColors, _shadows: ThemeShadows) => ({
     textAlign: 'center' as const,
     lineHeight: 20,
     marginBottom: SPACING.lg,
+  },
+  messageProminent: {
+    ...TYPOGRAPHY.body,
+    color: colors.text,
+    lineHeight: 22,
   },
   buttonContainer: {
     flexDirection: 'row' as const,

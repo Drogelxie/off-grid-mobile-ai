@@ -78,7 +78,33 @@ export function MessageAttachments({
   return (
     <View testID="message-attachments" style={styles.attachmentsContainer}>
       {attachments.map((attachment, index) =>
-        attachment.type === 'document' ? (
+        attachment.type === 'audio' ? (
+          <View
+            key={attachment.id}
+            testID={`audio-badge-${index}`}
+            style={[
+              styles.audioBadge,
+              isUser ? styles.documentBadgeUser : styles.documentBadgeAssistant,
+            ]}
+          >
+            <View style={styles.audioBadgeHeader}>
+              <Icon name="mic" size={14} color={isUser ? colors.background : colors.textSecondary} />
+              <Text
+                style={[styles.documentBadgeText, isUser ? styles.documentBadgeTextUser : styles.documentBadgeTextAssistant]}
+              >
+                Voice message
+              </Text>
+            </View>
+            {attachment.textContent ? (
+              <Text
+                testID={`audio-transcription-${index}`}
+                style={[styles.audioTranscription, isUser ? styles.documentBadgeTextUser : styles.documentBadgeTextAssistant]}
+              >
+                {attachment.textContent}
+              </Text>
+            ) : null}
+          </View>
+        ) : attachment.type === 'document' ? (
           <TouchableOpacity
             key={attachment.id}
             testID={`document-badge-${index}`}

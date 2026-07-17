@@ -1,8 +1,21 @@
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { ModelSource } from '../../types';
+import { ModelSource, ONNXImageModel } from '../../types';
 import { RootStackParamList, MainTabParamList } from '../../navigation/types';
+import type { AlertState } from '../../utils/alertState';
+
+/** Injected deps for the standalone image-download handlers. Lives here (not in
+ *  imageDownloadActions) so imageDownloadQnn can import it without importing imageDownloadActions,
+ *  which imports imageDownloadQnn back (a cycle). imageDownloadActions re-exports it. */
+export interface ImageDownloadDeps {
+  addDownloadedImageModel: (m: ONNXImageModel) => void;
+  activeImageModelId: string | null;
+  setActiveImageModelId: (id: string) => void;
+  setAlertState: (s: AlertState) => void;
+  /** When false, skip auto-load so the onboarding spotlight can guide the user to load manually. */
+  triedImageGen: boolean;
+}
 
 export type BackendFilter = 'all' | 'mnn' | 'qnn' | 'coreml';
 
@@ -31,7 +44,7 @@ export type SizeFilter = 'all' | 'tiny' | 'small' | 'medium' | 'large';
 export type SortOption = 'recommended' | 'bestfit' | 'size' | 'downloads' | 'recency';
 export type FilterDimension = 'org' | 'type' | 'source' | 'size' | 'quant' | 'sort' | null;
 export type ImageFilterDimension = 'backend' | 'style' | 'sdVersion' | null;
-export type ModelTab = 'text' | 'image';
+export type ModelTab = 'text' | 'image' | 'voice' | 'transcription';
 
 export interface FilterState {
   orgs: string[];

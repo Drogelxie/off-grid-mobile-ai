@@ -1,19 +1,35 @@
 import { RNLlamaOAICompatibleMessage, RNLlamaMessagePart } from 'llama.rn';
-import { Message } from '../types';
+import { Message, MediaAttachment } from '../types';
 
-export function formatLlamaMessages(messages: Message[], supportsVision: boolean): string {
+/**
+ * PRODUCT RULE: every voice note is transcribed (whisper) and ONLY its transcript is sent to the
+ * model — the audio attachment is display/playback ONLY, never model input. So the llama message
+ * builders NEVER attach audio as media. Sending the audio broke turns two ways:
+ *  - the transcript is already in message.content, so the audio is redundant; and
+ *  - the audio path is an absolute iOS container path that goes stale on reinstall/rebuild (new
+ *    container UUID) → "File does not exist or cannot be opened", hard-failing every voice-mode turn
+ *    in a persisted conversation (B9); a non-audio mmproj also throws "Failed to load media" (B5).
+ * Returning [] unconditionally enforces the transcript-only contract for every model + state
+ * (including a not-yet-transcribed note — which must not reach the model as raw audio either). */
+function modelAudioAttachments(_attachments: MediaAttachment[] | undefined): MediaAttachment[] {
+  return [];
+}
+
+export function formatLlamaMessages(messages: Message[], supportsVision: boolean, supportsAudio = false): string {
   let prompt = '';
   for (const message of messages.filter(m => !m.isSystemInfo)) {
     if (message.role === 'system') {
       prompt += `<|im_start|>system\n${message.content}<|im_end|>\n`;
     } else if (message.role === 'user') {
       let content = message.content;
-      if (message.attachments && message.attachments.length > 0 && supportsVision) {
-        const imageMarkers = message.attachments
-          .filter(a => a.type === 'image')
-          .map(() => '<__media__>')
-          .join('');
-        content = imageMarkers + content;
+      if (message.attachments && message.attachments.length > 0) {
+        const imageMarkers = supportsVision
+          ? message.attachments.filter(a => a.type === 'image').map(() => '<__media__>').join('')
+          : '';
+        const audioMarkers = supportsAudio
+          ? modelAudioAttachments(message.attachments).map(() => '<__media__>').join('')
+          : '';
+        content = imageMarkers + audioMarkers + content;
       }
       prompt += `<|im_start|>user\n${content}<|im_end|>\n`;
     } else if (message.role === 'assistant') {
@@ -48,45 +64,38 @@ function formatToolCallAsText(tc: { name: string; arguments: string }): string {
   return `<tool_call>{"name":${escapedName},"arguments":${tc.arguments}}</tool_call>`;
 }
 
-export function buildOAIMessages(messages: Message[]): RNLlamaOAICompatibleMessage[] {
-  const filtered = messages.filter(m => !m.isSystemInfo);
-  return filtered.map((message) => {
-    // Flatten tool result messages into user messages —
-    // avoids role:"tool" which some Jinja templates don't handle
+function toFileUrl(uri: string, requireFilePrefix = false): string {
+  if (requireFilePrefix) return uri.startsWith('file://') ? uri : `file://${uri}`;
+  return uri.startsWith('file://') || uri.startsWith('http') ? uri : `file://${uri}`;
+}
+
+function buildMediaParts(message: Message, supportsAudio: boolean): RNLlamaMessagePart[] {
+  const parts: RNLlamaMessagePart[] = [];
+  for (const a of message.attachments?.filter(att => att.type === 'image') ?? []) {
+    parts.push({ type: 'image_url', image_url: { url: toFileUrl(a.uri) } });
+  }
+  if (supportsAudio) {
+    for (const a of modelAudioAttachments(message.attachments)) {
+      parts.push({ type: 'input_audio', input_audio: { format: a.audioFormat ?? 'wav', url: toFileUrl(a.uri, true) } });
+    }
+  }
+  if (message.content) parts.push({ type: 'text', text: message.content });
+  return parts;
+}
+
+export function buildOAIMessages(messages: Message[], supportsAudio = false): RNLlamaOAICompatibleMessage[] {
+  return messages.filter(m => !m.isSystemInfo).map((message) => {
     if (message.role === 'tool') {
       const label = message.toolName || 'tool';
-      return {
-        role: 'user' as const,
-        content: `[Tool Result: ${label}]\n${message.content}\n[End Tool Result]`,
-      };
+      return { role: 'user' as const, content: `[Tool Result: ${label}]\n${message.content}\n[End Tool Result]` };
     }
-
-    // Flatten assistant tool calls into plain text —
-    // structured tool_calls in history cause Jinja/C++ conflicts
     if (message.role === 'assistant' && message.toolCalls?.length) {
       const toolCallText = message.toolCalls.map(formatToolCallAsText).join('\n');
-      const content = message.content
-        ? `${message.content}\n${toolCallText}`
-        : toolCallText;
-      return { role: 'assistant' as const, content };
+      return { role: 'assistant' as const, content: message.content ? `${message.content}\n${toolCallText}` : toolCallText };
     }
-
-    const imageAttachments = message.attachments?.filter(a => a.type === 'image') || [];
-    if (imageAttachments.length === 0 || message.role !== 'user') {
-      return { role: message.role, content: message.content };
-    }
-
-    const contentParts: RNLlamaMessagePart[] = [];
-    for (const attachment of imageAttachments) {
-      let imagePath = attachment.uri;
-      if (!imagePath.startsWith('file://') && !imagePath.startsWith('http')) {
-        imagePath = `file://${imagePath}`;
-      }
-      contentParts.push({ type: 'image_url', image_url: { url: imagePath } });
-    }
-    if (message.content) {
-      contentParts.push({ type: 'text', text: message.content });
-    }
-    return { role: message.role, content: contentParts };
+    const hasImage = message.role === 'user' && message.attachments?.some(a => a.type === 'image');
+    const hasAudio = supportsAudio && message.role === 'user' && modelAudioAttachments(message.attachments).length > 0;
+    if (!hasImage && !hasAudio) return { role: message.role, content: message.content };
+    return { role: message.role, content: buildMediaParts(message, supportsAudio) };
   });
 }

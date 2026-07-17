@@ -1,5 +1,5 @@
 /* eslint-disable max-lines */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
-import LinearGradient from 'react-native-linear-gradient';
 import { AttachStep } from 'react-native-spotlight-tour';
 import { useNavigation, CommonActions, CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,6 +20,9 @@ import { Card } from '../components';
 import { AnimatedEntry } from '../components/AnimatedEntry';
 import { AnimatedListItem } from '../components/AnimatedListItem';
 import { MadeWithLove } from '../components/MadeWithLove';
+import { DebugLogsScreen } from '../components/DebugLogsScreen';
+import { useSettingsSections } from '../components/settings/sectionRegistry';
+import { ProUpsellBanner } from '../components/settings/ProUpsellBanner';
 import { useFocusTrigger } from '../hooks/useFocusTrigger';
 import { useTheme, useThemedStyles } from '../theme';
 import type { ThemeColors, ThemeShadows } from '../theme';
@@ -30,11 +32,13 @@ import RNFS from 'react-native-fs';
 import { useAppStore, useRemoteServerStore } from '../stores';
 import { hardwareService } from '../services';
 import { RootStackParamList, MainTabParamList } from '../navigation/types';
-import { GITHUB_URL, SHARE_ON_X_URL } from '../utils/sharePrompt';
+import { GITHUB_URL, FOLLOW_X_URL, SLACK_INVITE_URL, shareOnX } from '../utils/sharePrompt';
+import { clearProForTesting } from '../services/proLicenseService';
+import { useProStatusLabel } from '../hooks/useProStatusLabel';
 import { SUPPORTED_LANGUAGES } from '../i18n';
 import packageJson from '../../package.json';
 
-const FEEDBACK_EMAIL = 'support@offgridmobile.co';
+const FEEDBACK_EMAIL = 'support@offgridmobileai.co';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'SettingsTab'>,
@@ -44,8 +48,11 @@ type NavigationProp = CompositeNavigationProp<
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const focusTrigger = useFocusTrigger();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  // Reactive: Pro sections registered at runtime (license-key activation re-runs
+  // loadProFeatures) show up live without an app restart.
+  const settingsSections = useSettingsSections();
   const { t } = useTranslation();
   const setOnboardingComplete = useAppStore((s) => s.setOnboardingComplete);
   const themeMode = useAppStore((s) => s.themeMode);
@@ -54,9 +61,15 @@ export const SettingsScreen: React.FC = () => {
   const setLanguage = useAppStore((s) => s.setLanguage);
   const completeChecklistStep = useAppStore((s) => s.completeChecklistStep);
   const resetChecklist = useAppStore((s) => s.resetChecklist);
+  const [showDebugLogs, setShowDebugLogs] = useState(false);
   const deviceInfo = useAppStore((s) => s.deviceInfo);
-  const showProBanner = useAppStore((s) => !s.proBannerDismissed);
-  const setProBannerDismissed = useAppStore((s) => s.setProBannerDismissed);
+  // Hidden once the user dismisses it, or once Pro is active (the upsell makes no
+  // sense to a paid user). hasRegisteredPro only flips true after RC verification
+  // (activateProByEmail / revalidatePro), so this also covers "paid and verified".
+  const devProDisabled = useAppStore((s) => s.devProDisabled);
+  const setDevProDisabled = useAppStore((s) => s.setDevProDisabled);
+  const setHasRegisteredPro = useAppStore((s) => s.setHasRegisteredPro);
+  const { proStatusLabel } = useProStatusLabel();
 
   useEffect(() => {
     completeChecklistStep('exploredSettings');
@@ -81,7 +94,7 @@ export const SettingsScreen: React.FC = () => {
       ? `Device: ${deviceInfo.deviceModel} (${deviceInfo.systemName} ${deviceInfo.systemVersion})`
       : 'Device: Unknown';
 
-    const subject = encodeURIComponent(`[Feedback] Off Grid v${packageJson.version}`);
+    const subject = encodeURIComponent(`[Feedback] Off Grid AI v${packageJson.version}`);
     const body = encodeURIComponent(
       `Hi,\n\n[Describe your feedback or issue here]\n\n` +
       `---\n` +
@@ -104,6 +117,27 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
+  // DEV-only: flip the Pro auto-unlock. Disabling also clears the cached license
+  // so the build behaves like a fresh free install. We flip the store flags
+  // synchronously (so the UI drops Pro immediately) and do NOT auto-reload —
+  // an immediate reload races the async persist write and rehydrates the old
+  // Pro-active state. A manual restart applies feature load/unload (slots
+  // registered at boot can't be cleanly torn down at runtime).
+  const handleToggleDevPro = async () => {
+    const disabling = !devProDisabled;
+    if (disabling) {
+      setDevProDisabled(true);
+      await clearProForTesting();
+      setHasRegisteredPro(false);
+    } else {
+      setDevProDisabled(false);
+    }
+    Alert.alert(
+      disabling ? 'Pro disabled (DEV)' : 'Pro enabled (DEV)',
+      `Restart the app to fully ${disabling ? 'unload' : 'load'} Pro features.`,
+    );
+  };
+
   const handleResetOnboarding = () => {
     setOnboardingComplete(false);
     // Navigate to root stack and reset to Onboarding
@@ -124,52 +158,7 @@ export const SettingsScreen: React.FC = () => {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
 
         {/* PRO Banner */}
-        {showProBanner && (
-          <AnimatedEntry index={0} staggerMs={40} trigger={focusTrigger}>
-            <LinearGradient
-                colors={isDark ? ['#141414', '#141414', '#1A2B1E'] : ['#FFFFFF', '#FFFFFF', '#E8F5EE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.proCard}
-              >
-              <View style={styles.proCardHeader}>
-                <View style={styles.proCardHeaderText}>
-                  <Text style={styles.proTitle}>Off Grid PRO</Text>
-                  <Text style={styles.proDesc}>
-                    {t('settings.unlockPremiumFeatures')}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => setProBannerDismissed(true)} style={styles.proCloseButton}>
-                  <Icon name="x" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.proFeatureGrid}>
-                {[
-                  [{ icon: 'mic', label: 'VOICE' }, { icon: 'star', label: 'MCPs' }],
-                  [{ icon: 'calendar', label: 'CALENDAR' }, { icon: 'message-square', label: 'MESSAGING' }],
-                ].map((row, i) => (
-                  <View key={i} style={styles.proFeatureRow}>
-                    {row.map(f => (
-                      <View key={f.label} style={styles.proFeatureItem}>
-                        <View style={styles.proFeatureIconWrap}>
-                          <Icon name={f.icon} size={16} color={colors.primary} />
-                        </View>
-                        <Text style={styles.proFeatureLabel}>{f.label}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ))}
-              </View>
-              <TouchableOpacity
-                style={styles.proCtaButton}
-                onPress={() => navigation.navigate('ProDetail')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.proCtaText}>{t('proDetail.iAmIn')}</Text>
-              </TouchableOpacity>
-            </LinearGradient>
-          </AnimatedEntry>
-        )}
+        <ProUpsellBanner trigger={focusTrigger} onGetPro={() => navigation.navigate('ProDetail')} />
 
         {/* Language Selector */}
         <AnimatedEntry index={0} staggerMs={40} trigger={focusTrigger}>
@@ -228,12 +217,12 @@ export const SettingsScreen: React.FC = () => {
         <AttachStep index={5} fill>
           <View style={styles.navSection}>
             {[
-              { icon: 'sliders', title: t('settings.modelSettings'), desc: t('settings.modelSettingsDesc'), screen: 'ModelSettings' as const },
-              { icon: 'wifi', title: t('settings.remoteServers'), desc: t('settings.remoteServersDesc'), screen: 'RemoteServers' as const },
-              { icon: 'mic', title: t('settings.voiceTranscription'), desc: t('settings.voiceTranscriptionDesc'), screen: 'VoiceSettings' as const },
-              { icon: 'lock', title: t('settings.security'), desc: t('settings.securityDesc'), screen: 'SecuritySettings' as const },
-              { icon: 'smartphone', title: t('settings.deviceInfo'), desc: t('settings.deviceInfoDesc'), screen: 'DeviceInfo' as const },
-              { icon: 'hard-drive', title: t('settings.storage'), desc: t('settings.storageDesc'), screen: 'StorageSettings' as const },
+              { icon: 'sliders', title: 'Model Settings', desc: 'System prompt, generation, and performance', screen: 'ModelSettings' as const },
+              { icon: 'wifi', title: 'Remote Servers', desc: 'Connect to Off Grid AI Desktop, Ollama, LM Studio, and more', screen: 'RemoteServers' as const },
+            //  { icon: 'search', title: 'Web Search', desc: 'Configure search API key for reliable results', screen: 'WebSearchSettings' as const },
+              { icon: 'lock', title: 'Security', desc: 'Passphrase and app lock', screen: 'SecuritySettings' as const },
+              { icon: 'smartphone', title: 'Device Information', desc: 'Hardware and compatibility', screen: 'DeviceInfo' as const },
+              { icon: 'hard-drive', title: 'Storage', desc: 'Models and data usage', screen: 'StorageSettings' as const },
             ].map((item, index, arr) => (
               <AnimatedListItem
                 key={item.screen}
@@ -268,19 +257,59 @@ export const SettingsScreen: React.FC = () => {
             </View>
             <View style={styles.proCardText}>
               <View style={styles.proTitleRow}>
-                <Text style={styles.proNavTitle}>{t('settings.offGridPro')}</Text>
+                <Text style={styles.proNavTitle}>Off Grid AI PRO</Text>
                 <View style={styles.proBadge}>
                   <Text style={styles.proBadgeText}>PRO</Text>
                 </View>
               </View>
-              <Text style={styles.proDesc}>{t('settings.unlockPremiumFeatures')}</Text>
+              <Text style={styles.proDesc}>{proStatusLabel}</Text>
             </View>
             <Icon name="chevron-right" size={16} color={colors.textMuted} />
           </TouchableOpacity>
         </AnimatedEntry>
 
-        {/* Community */}
+        {/* Stay in the loop */}
         <AnimatedEntry index={7} staggerMs={40} trigger={focusTrigger}>
+          <View style={styles.followSection}>
+            <View style={styles.followHeader}>
+              <Text style={styles.followHeaderTitle}>Stay in the loop</Text>
+              <Text style={styles.followHeaderDesc}>
+                New features land here first, subscribers get promo discounts, and your feedback shapes what gets built next.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.navItem}
+              testID="follow-on-x"
+              onPress={() => Linking.openURL(FOLLOW_X_URL)}
+            >
+              <View style={styles.followItemIcon}>
+                <Icon name="twitter" size={16} color={colors.primary} />
+              </View>
+              <View style={styles.navItemContent}>
+                <Text style={styles.navItemTitle}>Follow @alichherawalla on X</Text>
+                <Text style={styles.navItemDesc}>Feature drops, promo discounts, roadmap</Text>
+              </View>
+              <Icon name="external-link" size={14} color={colors.textMuted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.navItem, styles.navItemLast]}
+              testID="join-slack"
+              onPress={() => Linking.openURL(SLACK_INVITE_URL)}
+            >
+              <View style={styles.followItemIcon}>
+                <IconMC name="slack" size={16} color={colors.primary} />
+              </View>
+              <View style={styles.navItemContent}>
+                <Text style={styles.navItemTitle}>Join the Slack community</Text>
+                <Text style={styles.navItemDesc}>Issues fixed fast, debug together, early access</Text>
+              </View>
+              <Icon name="external-link" size={14} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </AnimatedEntry>
+
+        {/* Community */}
+        <AnimatedEntry index={8} staggerMs={40} trigger={focusTrigger}>
           <View style={styles.navSection}>
             <TouchableOpacity style={styles.navItem} onPress={() => Linking.openURL(GITHUB_URL)}>
               <View style={styles.navItemIcon}>
@@ -302,13 +331,13 @@ export const SettingsScreen: React.FC = () => {
               </View>
               <Icon name="external-link" size={14} color={colors.textMuted} />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.navItem, styles.navItemLast]} onPress={() => Linking.openURL(SHARE_ON_X_URL)}>
+            <TouchableOpacity style={[styles.navItem, styles.navItemLast]} onPress={() => shareOnX()}>
               <View style={styles.navItemIcon}>
                 <Icon name="share-2" size={16} color={colors.textSecondary} />
               </View>
               <View style={styles.navItemContent}>
-                <Text style={styles.navItemTitle}>{t('settings.shareOnX')}</Text>
-                <Text style={styles.navItemDesc}>{t('settings.tellOthersAboutOffGrid')}</Text>
+                <Text style={styles.navItemTitle}>Share on X</Text>
+                <Text style={styles.navItemDesc}>Tell others about Off Grid AI</Text>
               </View>
               <Icon name="external-link" size={14} color={colors.textMuted} />
             </TouchableOpacity>
@@ -316,7 +345,7 @@ export const SettingsScreen: React.FC = () => {
         </AnimatedEntry>
 
         {/* About */}
-        <AnimatedEntry index={8} staggerMs={40} trigger={focusTrigger}>
+        <AnimatedEntry index={9} staggerMs={40} trigger={focusTrigger}>
           <View style={styles.navSection}>
             <TouchableOpacity style={[styles.navItem, styles.navItemLast]} onPress={() => navigation.navigate('About')}>
               <View style={styles.navItemIcon}>
@@ -332,7 +361,7 @@ export const SettingsScreen: React.FC = () => {
         </AnimatedEntry>
 
         {/* Privacy */}
-        <AnimatedEntry index={9} staggerMs={40} trigger={focusTrigger}>
+        <AnimatedEntry index={10} staggerMs={40} trigger={focusTrigger}>
           <Card style={styles.privacyCard}>
             <View style={styles.privacyIconContainer}>
               <Icon name="shield" size={18} color={colors.textSecondary} />
@@ -342,20 +371,35 @@ export const SettingsScreen: React.FC = () => {
           </Card>
         </AnimatedEntry>
 
-        {/* Reset Onboarding */}
-        <AnimatedEntry index={10} staggerMs={40} trigger={focusTrigger}>
-          <View style={styles.devButtonGroup}>
-            <TouchableOpacity style={styles.devButton} onPress={handleResetOnboarding}>
-              <Icon name="rotate-ccw" size={14} color={colors.textMuted} />
-              <Text style={styles.devButtonText}>{t('settings.resetOnboarding')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.devButton} onPress={resetChecklist}>
-              <Icon name="list" size={14} color={colors.textMuted} />
-              <Text style={styles.devButtonText}>{t('settings.resetOnboardingChecklist')}</Text>
-            </TouchableOpacity>
-          </View>
-        </AnimatedEntry>
+        {/* Pro feature sections registered at runtime by @offgrid/pro */}
+        {settingsSections.map((Section, i) => <Section key={Section.displayName ?? String(i)} />)}
+
+        {/* Dev-only tooling — stripped from release builds */}
+        {__DEV__ && (
+          <AnimatedEntry index={11} staggerMs={40} trigger={focusTrigger}>
+            <View style={styles.devButtonGroup}>
+              <TouchableOpacity style={styles.devButton} onPress={handleResetOnboarding}>
+                <Icon name="rotate-ccw" size={14} color={colors.textMuted} />
+                <Text style={styles.devButtonText}>Reset Onboarding</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.devButton} onPress={resetChecklist}>
+                <Icon name="list" size={14} color={colors.textMuted} />
+                <Text style={styles.devButtonText}>Reset Onboarding Checklist</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.devButton} onPress={() => setShowDebugLogs(true)}>
+                <Icon name="terminal" size={14} color={colors.textMuted} />
+                <Text style={styles.devButtonText}>Debug Logs</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.devButton} onPress={handleToggleDevPro}>
+                <Icon name={devProDisabled ? 'unlock' : 'lock'} size={14} color={colors.textMuted} />
+                <Text style={styles.devButtonText}>{devProDisabled ? 'Turn on Pro (DEV)' : 'Turn off Pro (DEV)'}</Text>
+              </TouchableOpacity>
+            </View>
+          </AnimatedEntry>
+        )}
+
         <MadeWithLove />
+        {__DEV__ && <DebugLogsScreen visible={showDebugLogs} onClose={() => setShowDebugLogs(false)} />}
       </ScrollView>
     </SafeAreaView>
   );
@@ -404,6 +448,22 @@ const createStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   navItemContent: { flex: 1 },
   navItemTitle: { ...TYPOGRAPHY.body, fontWeight: '400' as const, color: colors.text },
   navItemDesc: { ...TYPOGRAPHY.bodySmall, color: colors.textMuted, marginTop: 2 },
+  followSection: {
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    marginBottom: SPACING.lg,
+    overflow: 'hidden' as const,
+    borderWidth: 1,
+    borderColor: `${colors.primary}40`, // emerald accent so it stands out above About
+    ...shadows.small,
+  },
+  followHeader: { padding: SPACING.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  followHeaderTitle: { ...TYPOGRAPHY.body, fontWeight: '400' as const, color: colors.primary },
+  followHeaderDesc: { ...TYPOGRAPHY.bodySmall, color: colors.textMuted, marginTop: 4, lineHeight: 18 },
+  followItemIcon: {
+    width: 28, height: 28, borderRadius: 6, backgroundColor: `${colors.primary}1A`,
+    alignItems: 'center' as const, justifyContent: 'center' as const, marginRight: SPACING.md,
+  },
   section: { marginBottom: SPACING.lg },
   aboutRow: {
     flexDirection: 'row' as const, justifyContent: 'space-between' as const,
@@ -426,72 +486,12 @@ const createStyles = (colors: ThemeColors, shadows: ThemeShadows) => ({
   },
   devButtonGroup: { gap: 12 },
   devButtonText: { ...TYPOGRAPHY.bodySmall, color: colors.textMuted },
-  proCard: {
-    borderRadius: 12,
-    marginBottom: SPACING.lg,
-    overflow: 'hidden' as const,
-    borderWidth: 1,
-    borderColor: `${colors.primary}40`,
-    ...shadows.small,
-  },
   proCardText: { flex: 1 },
   proTitleRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: SPACING.sm, marginBottom: 2 },
-  proTitle: { ...TYPOGRAPHY.h1, color: colors.primary, marginBottom: SPACING.xs, fontWeight: '700' as const },
   proBadge: { backgroundColor: colors.primary, borderRadius: 20, paddingHorizontal: SPACING.sm, paddingVertical: 2 },
   proBadgeText: { ...TYPOGRAPHY.labelSmall, color: '#FFFFFF', letterSpacing: 0.5 },
   proDesc: { ...TYPOGRAPHY.bodySmall, color: colors.textSecondary },
   proIconContainer: { width: 44, height: 44, borderRadius: 22, backgroundColor: `${colors.primary}1A`, alignItems: 'center' as const, justifyContent: 'center' as const },
-  proCardHeader: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, justifyContent: 'space-between' as const, padding: SPACING.lg, paddingBottom: SPACING.md },
-  proCardHeaderText: { flex: 1, marginRight: SPACING.md },
-  proFeatureGrid: {
-    flexDirection: 'column' as const,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.md,
-    gap: SPACING.sm,
-  },
-  proFeatureRow: {
-    flexDirection: 'row' as const,
-    gap: SPACING.sm,
-  },
-  proFeatureItem: {
-    flex: 1,
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: SPACING.sm,
-  },
-  proFeatureIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceLight,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  proFeatureLabel: {
-    ...TYPOGRAPHY.label,
-    color: colors.text,
-    letterSpacing: 0.5,
-    fontWeight: '500' as const,
-  },
-  proCtaButton: {
-    margin: SPACING.lg,
-    marginTop: SPACING.sm,
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: SPACING.md,
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    gap: SPACING.sm,
-  },
-  proCtaText: {
-    ...TYPOGRAPHY.body,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  proCloseButton: {
-    padding: SPACING.xs,
-  },
   proNavButton: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,

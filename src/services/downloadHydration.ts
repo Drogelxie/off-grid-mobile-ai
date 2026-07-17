@@ -1,7 +1,9 @@
 import { backgroundDownloadService } from './backgroundDownloadService';
-import { useDownloadStore, DownloadEntry, DownloadStatus, ModelType } from '../stores/downloadStore';
+import { useDownloadStore, DownloadEntry, DownloadStatus, ModelType, isActiveStatus } from '../stores/downloadStore';
 import { makeModelKey, ModelKey } from '../utils/modelKey';
 import { BackgroundDownloadStatus } from '../types';
+import { isMMProjFile } from './mmproj';
+import { loadActiveDownloads } from './activeDownloadPersistence';
 import logger from '../utils/logger';
 
 type NativeDownloadRow = {
@@ -22,9 +24,14 @@ type NativeDownloadRow = {
   metadataJson?: string;
 };
 
+/**
+ * Is this download-row filename a multimodal projector (mmproj) rather than a model weights file?
+ * Delegates to the single source of truth (src/services/mmproj.ts) so "is this a projector" is defined
+ * once — the previous local copy matched only 'mmproj' and missed 'projector'/'clip' names. Re-exported so
+ * modelManager/restore.ts's orphaned-sidecar filter shares the exact same rule (DRY).
+ */
 export function isMmProjFileName(fileName: string): boolean {
-  const lower = fileName.toLowerCase();
-  return lower.includes('mmproj');
+  return isMMProjFile(fileName);
 }
 
 function mapNativeStatus(status: BackgroundDownloadStatus): DownloadStatus {
@@ -131,6 +138,48 @@ function toDownloadEntry(
   };
 }
 
+/**
+ * An in-flight entry we already knew about whose native download row is GONE from the
+ * fresh snapshot was interrupted by an app-kill (iOS URLSession drops its task on
+ * force-quit; a foreground STT/multi-file transfer dies with the process; Android
+ * WorkManager instead SURVIVES and reappears in the snapshot, so it is never here).
+ *
+ * The relaxed product rule: we do not need to resume the actual bytes across a kill —
+ * we must NEVER let the download silently vanish. Carry the prior entry forward as a
+ * `failed`/retriable entry so the Download Manager keeps a card (with Retry/Remove),
+ * rather than a phantom "downloading" or nothing at all. This is the single native-row
+ * reconcile path for every model type (text/image/stt) — no per-type fork.
+ *
+ * A prior entry that had already `completed`/`cancelled` is intentionally dropped (a
+ * clean finish moved it to its domain store; nothing to strand).
+ */
+function strandInterruptedEntries(
+  hydratedKeys: Set<ModelKey>,
+  persistedPrior: DownloadEntry[],
+): DownloadEntry[] {
+  // Prior in-flight entries come from TWO sources, so an interrupted download is caught after a
+  // FOREGROUND resume (in-memory store still populated) AND a cold app-kill (in-memory gone, only the
+  // durably-persisted snapshot survives). In-memory wins on conflict (it's the more recent truth).
+  const priors = new Map<ModelKey, DownloadEntry>();
+  for (const e of persistedPrior) priors.set(e.modelKey, e);
+  for (const e of Object.values(useDownloadStore.getState().downloads)) priors.set(e.modelKey, e);
+
+  const stranded: DownloadEntry[] = [];
+  for (const prior of priors.values()) {
+    if (hydratedKeys.has(prior.modelKey)) continue; // still has a live native row (Android WorkManager survives → never stranded)
+    if (!isActiveStatus(prior.status)) continue;     // already completed/failed/cancelled
+    logger.log(
+      `[DL-SM] ${prior.modelType}:${prior.modelId} hydrate: native row gone (app-kill) → failed/retriable`,
+    );
+    stranded.push({
+      ...prior,
+      status: 'failed',
+      errorMessage: prior.errorMessage ?? 'Interrupted — app closed. Tap retry.',
+    });
+  }
+  return stranded;
+}
+
 export async function hydrateDownloadStore(): Promise<void> {
   if (!backgroundDownloadService.isAvailable()) return;
 
@@ -153,6 +202,15 @@ export async function hydrateDownloadStore(): Promise<void> {
       });
     }
   }
+
+  // Native rows are the source of truth for what is genuinely in flight; but a row that
+  // VANISHED (vs one that reports a new status) means an interrupted transfer whose task
+  // the OS discarded. Preserve the prior in-flight entry as failed/retriable so it never
+  // silently disappears from the Download Manager — including across a cold app-kill, where
+  // the prior entry survives only in the durably-persisted snapshot (loadActiveDownloads).
+  const hydratedKeys = new Set(entries.map(e => e.modelKey));
+  const persistedPrior = await loadActiveDownloads();
+  entries.push(...strandInterruptedEntries(hydratedKeys, persistedPrior));
 
   useDownloadStore.getState().hydrate(entries);
 }

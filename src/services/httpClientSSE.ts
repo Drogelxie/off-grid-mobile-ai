@@ -3,12 +3,12 @@
  */
 
 import logger from '../utils/logger';
-import type { SSEEvent, OpenAIStreamMessage, AnthropicStreamMessage } from './httpClient';
+import type { SSEEvent, OpenAIStreamMessage, AnthropicStreamMessage } from './httpClientTypes';
 
 /**
  * Process parsed event and yield it
  */
-export function yieldSSEvent(currentEvent: Partial<SSEEvent>): SSEEvent {
+function yieldSSEvent(currentEvent: Partial<SSEEvent>): SSEEvent {
   return {
     event: currentEvent.event,
     data: currentEvent.data as string,
@@ -20,7 +20,7 @@ export function yieldSSEvent(currentEvent: Partial<SSEEvent>): SSEEvent {
  * Parse a single SSE line into the current event
  * Returns true if an event should be yielded (empty line received)
  */
-export function parseSSELine(
+function parseSSELine(
   trimmed: string,
   currentEvent: Partial<SSEEvent>
 ): boolean {
@@ -85,27 +85,6 @@ export function createSSELineProcessor(onEvent: (event: SSEEvent) => void) {
 }
 
 /**
- * Process SSE lines from text and invoke callback for each event
- * Used by XHR onprogress and onreadystatechange handlers
- * NOTE: Does not buffer partial lines — use createSSELineProcessor for XHR streaming.
- */
-export function processSSELines(
-  newData: string,
-  onEvent: (event: SSEEvent) => void
-): void {
-  const lines = newData.split('\n');
-  let currentEvent: Partial<SSEEvent> = {};
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (parseSSELine(trimmed, currentEvent)) {
-      onEvent(yieldSSEvent(currentEvent));
-      currentEvent = {};
-    }
-  }
-}
-
-/**
  * Parse SSE events from a stream
  */
 export async function* parseSSEStream(
@@ -148,27 +127,6 @@ export async function* parseSSEStream(
     }
   } finally {
     reader.releaseLock();
-  }
-}
-
-/**
- * Parse SSE events from text (for React Native compatibility)
- */
-export function* parseSSEFromText(text: string): Generator<SSEEvent, void, unknown> {
-  const lines = text.split('\n');
-  let currentEvent: Partial<SSEEvent> = {};
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (parseSSELine(trimmed, currentEvent)) {
-      yield yieldSSEvent(currentEvent);
-      currentEvent = {};
-    }
-  }
-
-  // Yield any remaining event
-  if (currentEvent.data !== undefined) {
-    yield yieldSSEvent(currentEvent);
   }
 }
 
