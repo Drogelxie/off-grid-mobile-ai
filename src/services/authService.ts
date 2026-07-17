@@ -1,12 +1,28 @@
 import * as Keychain from 'react-native-keychain';
-import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import logger from '../utils/logger';
 
 const SERVICE_NAME = 'ai.offgridmobile.auth';
 const PASSPHRASE_KEY = 'passphrase_hash';
-const PBKDF2_ITERATIONS = 100_000;
+/**
+ * v2 hashes were written with 100k iterations. Pure-JS PBKDF2 on Hermes (no JIT)
+ * runs ~100x slower than native crypto: measured on a budget MediaTek device
+ * (Oukitel WP22, 2026-07-17) 100k iterations froze the JS thread for MINUTES,
+ * making set/verify appear hung. Kept only to verify existing v2 hashes, which
+ * are migrated to v3 on the next successful login.
+ */
+const PBKDF2_ITERATIONS_V2 = 100_000;
+/**
+ * v3 default: seconds instead of minutes on low-end devices. This gate protects
+ * UI access on a personal device (the data is not encrypted with this key), so
+ * the per-install random salt + a few thousand iterations remain an acceptable
+ * trade-off. The iteration count is stored inside the hash string, so it can be
+ * raised later without breaking existing hashes.
+ */
+const PBKDF2_ITERATIONS_V3 = 5_000;
+const PBKDF2_MAX_ITERATIONS = 1_000_000;
 const SALT_BYTES = 16;
 
 class AuthService {
@@ -65,23 +81,27 @@ class AuthService {
    *
    * Implemented with @noble/hashes (pure JS, audited) so it runs on Hermes
    * without a native crypto module. Output is byte-identical to a Web Crypto /
-   * Node PBKDF2 with the same parameters.
+   * Node PBKDF2 with the same parameters. The async variant yields to the
+   * event loop between blocks, so the UI (spinner, "Wird überprüft…") keeps
+   * rendering while the derivation runs.
    */
-  private deriveHash(passphrase: string, salt: Uint8Array): string {
-    const bits = pbkdf2(sha256, utf8ToBytes(passphrase), salt, {
-      c: PBKDF2_ITERATIONS,
+  private deriveHash(passphrase: string, salt: Uint8Array, iterations: number): Promise<string> {
+    return pbkdf2Async(sha256, utf8ToBytes(passphrase), salt, {
+      c: iterations,
       dkLen: 32,
-    });
-    return bytesToHex(bits);
+    }).then(bytesToHex);
   }
 
   /**
-   * Produce a stored hash string in the format "v2:<saltHex>:<hashHex>".
-   * The salt is generated fresh per call so each stored hash is unique.
+   * Produce a stored hash string in the format
+   * "v3:<iterations>:<saltHex>:<hashHex>". The salt is generated fresh per
+   * call so each stored hash is unique; the iteration count is embedded so it
+   * can be tuned without invalidating existing hashes.
    */
-  private hashPassphrase(passphrase: string): string {
+  private async hashPassphrase(passphrase: string): Promise<string> {
     const salt = this.generateSalt();
-    return `v2:${bytesToHex(salt)}:${this.deriveHash(passphrase, salt)}`;
+    const hash = await this.deriveHash(passphrase, salt, PBKDF2_ITERATIONS_V3);
+    return `v3:${PBKDF2_ITERATIONS_V3}:${bytesToHex(salt)}:${hash}`;
   }
 
   /**
@@ -101,7 +121,7 @@ class AuthService {
 
   async setPassphrase(passphrase: string): Promise<boolean> {
     try {
-      const hash = this.hashPassphrase(passphrase);
+      const hash = await this.hashPassphrase(passphrase);
       await Keychain.setGenericPassword(PASSPHRASE_KEY, hash, {
         service: SERVICE_NAME,
         accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
@@ -125,19 +145,39 @@ class AuthService {
 
       const stored = credentials.password;
 
+      if (stored.startsWith('v3:')) {
+        // Format: "v3:<iterations>:<saltHex>:<hashHex>"
+        const parts = stored.split(':');
+        const iterations = Number(parts[1]);
+        if (parts.length !== 4 || !Number.isInteger(iterations) || iterations < 1 || iterations > PBKDF2_MAX_ITERATIONS) {
+          logger.error('Stored passphrase hash is malformed');
+          return false;
+        }
+        const [, , saltHex, expectedHash] = parts;
+        const actualHash = await this.deriveHash(passphrase, hexToBytes(saltHex), iterations);
+        return this.timingSafeEqualHex(actualHash, expectedHash);
+      }
+
       if (stored.startsWith('v2:')) {
-        // Format: "v2:<saltHex>:<hashHex>"
+        // Format: "v2:<saltHex>:<hashHex>" — slow on-device (see
+        // PBKDF2_ITERATIONS_V2); verify once, then migrate to v3.
         const parts = stored.split(':');
         if (parts.length !== 3) {
           logger.error('Stored passphrase hash is malformed');
           return false;
         }
         const [, saltHex, expectedHash] = parts;
-        const actualHash = this.deriveHash(passphrase, hexToBytes(saltHex));
-        return this.timingSafeEqualHex(actualHash, expectedHash);
+        const actualHash = await this.deriveHash(passphrase, hexToBytes(saltHex), PBKDF2_ITERATIONS_V2);
+        if (!this.timingSafeEqualHex(actualHash, expectedHash)) {
+          return false;
+        }
+        if (!(await this.setPassphrase(passphrase))) {
+          logger.warn('Passphrase verified but migration to v3 hash failed');
+        }
+        return true;
       }
 
-      // Legacy v1 hash: verify, then migrate to v2 on success.
+      // Legacy v1 hash: verify, then migrate to v3 on success.
       const legacyHash = this.hashPassphraseLegacy(passphrase);
       if (legacyHash !== stored) {
         return false;
@@ -146,7 +186,7 @@ class AuthService {
       if (!migrated) {
         // Migration failed (e.g. keychain write error). The passphrase is
         // still valid, so allow login, but surface the failure for diagnosis.
-        logger.warn('Passphrase verified but migration to v2 hash failed');
+        logger.warn('Passphrase verified but migration to v3 hash failed');
       }
       return true;
     } catch (error) {
