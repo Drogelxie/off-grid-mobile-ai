@@ -217,12 +217,12 @@ export const SettingsScreen: React.FC = () => {
         <AttachStep index={5} fill>
           <View style={styles.navSection}>
             {[
-              { icon: 'sliders', title: 'Model Settings', desc: 'System prompt, generation, and performance', screen: 'ModelSettings' as const },
-              { icon: 'wifi', title: 'Remote Servers', desc: 'Connect to Off Grid AI Desktop, Ollama, LM Studio, and more', screen: 'RemoteServers' as const },
+              { icon: 'sliders', title: t('settings.modelSettings'), desc: t('settings.modelSettingsDesc'), screen: 'ModelSettings' as const },
+              { icon: 'wifi', title: t('settings.remoteServers'), desc: t('settings.remoteServersDesc'), screen: 'RemoteServers' as const },
             //  { icon: 'search', title: 'Web Search', desc: 'Configure search API key for reliable results', screen: 'WebSearchSettings' as const },
-              { icon: 'lock', title: 'Security', desc: 'Passphrase and app lock', screen: 'SecuritySettings' as const },
-              { icon: 'smartphone', title: 'Device Information', desc: 'Hardware and compatibility', screen: 'DeviceInfo' as const },
-              { icon: 'hard-drive', title: 'Storage', desc: 'Models and data usage', screen: 'StorageSettings' as const },
+              { icon: 'lock', title: t('settings.security'), desc: t('settings.securityDesc'), screen: 'SecuritySettings' as const },
+              { icon: 'smartphone', title: t('settings.deviceInfo'), desc: t('settings.deviceInfoDesc'), screen: 'DeviceInfo' as const },
+              { icon: 'hard-drive', title: t('settings.storage'), desc: t('settings.storageDesc'), screen: 'StorageSettings' as const },
             ].map((item, index, arr) => (
               <AnimatedListItem
                 key={item.screen}
@@ -336,8 +336,8 @@ export const SettingsScreen: React.FC = () => {
                 <Icon name="share-2" size={16} color={colors.textSecondary} />
               </View>
               <View style={styles.navItemContent}>
-                <Text style={styles.navItemTitle}>Share on X</Text>
-                <Text style={styles.navItemDesc}>Tell others about Off Grid AI</Text>
+                <Text style={styles.navItemTitle}>{t('settings.shareOnX')}</Text>
+                <Text style={styles.navItemDesc}>{t('settings.tellOthersAboutOffGrid')}</Text>
               </View>
               <Icon name="external-link" size={14} color={colors.textMuted} />
             </TouchableOpacity>

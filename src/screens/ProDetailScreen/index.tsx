@@ -7,6 +7,7 @@ import { useTheme, useThemedStyles } from '../../theme';
 import type { ThemeColors, ThemeShadows } from '../../theme';
 import { SPACING, TYPOGRAPHY, OFF_GRID_DESKTOP_URL } from '../../constants';
 import { useAppStore } from '../../stores';
+import { useTranslation } from 'react-i18next';
 import { PRO_PAY_PAGE_URL } from '../../services/proLicenseService';
 import { withUtm } from '../../utils/utm';
 import { loadProFeatures } from '../../bootstrap/loadProFeatures';
@@ -19,33 +20,34 @@ import { ProUnlockModal } from './ProUnlockModal';
 const PILLARS = [
   {
     icon: 'layers',
-    title: 'Ambient across your life',
-    desc: 'A quiet layer in the background - your laptop, your phone, the meetings in the room, the tabs you read.',
+    title: 'proDetail.pillarAmbientTitle',
+    desc: 'proDetail.pillarAmbientDesc',
   },
   {
     icon: 'sunrise',
-    title: 'Proactive, not reactive',
-    desc: 'It briefs you on the day, surfaces what you left open, and drafts the reply before you remember you owe it.',
+    title: 'proDetail.pillarProactiveTitle',
+    desc: 'proDetail.pillarProactiveDesc',
   },
   {
     icon: 'shield',
-    title: 'Private by architecture',
-    desc: 'The model runs on your own hardware. No training on your data, no server to leak. Open source, so you can check.',
+    title: 'proDetail.pillarPrivateTitle',
+    desc: 'proDetail.pillarPrivateDesc',
   },
   {
     icon: 'refresh-cw',
-    title: 'One mind across devices',
-    desc: 'Your laptop knows your work, your phone knows your life. They sync over your own network, never a cloud relay.',
+    title: 'proDetail.pillarOneMindTitle',
+    desc: 'proDetail.pillarOneMindDesc',
   },
   {
     icon: 'check-circle',
-    title: 'It acts, you approve',
-    desc: 'It drafts the reply, files the ticket, updates the doc - never on its own. Every action is yours to approve.',
+    title: 'proDetail.pillarActsTitle',
+    desc: 'proDetail.pillarActsDesc',
   },
 ];
 
 export const ProDetailScreen: React.FC = () => {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
   const hasRegisteredPro = useAppStore((s) => s.hasRegisteredPro);
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
@@ -84,7 +86,7 @@ export const ProDetailScreen: React.FC = () => {
           {hasRegisteredPro ? (
             <View style={styles.proActiveBadge}>
               <Icon name="check" size={12} color={colors.primary} />
-              <Text style={styles.proActiveBadgeText}>Pro Active</Text>
+              <Text style={styles.proActiveBadgeText}>{t('proDetail.proActive')}</Text>
             </View>
           ) : (
             <View style={styles.headerActions}>
@@ -92,13 +94,13 @@ export const ProDetailScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.headerKeyButton}
                 onPress={openVerifyModal}
-                accessibilityLabel="I have a license key"
+                accessibilityLabel={t('proDetail.haveLicenseKey')}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Icon name="key" size={16} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.getProButton} onPress={openPayPage}>
-                <Text style={styles.getProButtonText}>Get Pro</Text>
+                <Text style={styles.getProButtonText}>{t('proDetail.getPro')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -111,11 +113,9 @@ export const ProDetailScreen: React.FC = () => {
           <>
             {/* Hero */}
             <View style={styles.hero}>
-              <Text style={styles.heroTitle}>Intelligence, democratized.</Text>
-              <Text style={styles.heroPrimary}>On your device.</Text>
-              <Text style={styles.heroSubtitle}>
-                Ambient and proactive. It sees your day, remembers it, and gets ahead of you - and the model runs on your own hardware, so nothing is sent anywhere.
-              </Text>
+              <Text style={styles.heroTitle}>{t('proDetail.heroTitle2')}</Text>
+              <Text style={styles.heroPrimary}>{t('proDetail.heroPrimary2')}</Text>
+              <Text style={styles.heroSubtitle}>{t('proDetail.heroSubtitle2')}</Text>
             </View>
 
             {/* Pricing — flat themed surface, flips at the July 1 cutover. */}
@@ -130,21 +130,19 @@ export const ProDetailScreen: React.FC = () => {
 
             {/* Ambient pillars */}
             <View style={styles.pillarsSection}>
-              <Text style={styles.sectionLabel}>ONE PRIVATE LAYER</Text>
+              <Text style={styles.sectionLabel}>{t('proDetail.onePrivateLayer')}</Text>
               {PILLARS.map((p) => (
                 <View key={p.title} style={styles.pillarRow}>
                   <View style={styles.pillarIconWrap}>
                     <Icon name={p.icon} size={18} color={colors.primary} />
                   </View>
                   <View style={styles.pillarText}>
-                    <Text style={styles.pillarTitle}>{p.title}</Text>
-                    <Text style={styles.pillarDesc}>{p.desc}</Text>
+                    <Text style={styles.pillarTitle}>{t(p.title)}</Text>
+                    <Text style={styles.pillarDesc}>{t(p.desc)}</Text>
                   </View>
                 </View>
               ))}
-              <Text style={styles.julyNote}>
-                We are building this through July. The full layer lands over the month, added as it ships.
-              </Text>
+              <Text style={styles.julyNote}>{t('proDetail.julyNote')}</Text>
             </View>
 
             {/* CTAs — shared Button (outline). Buy is primary, verify is secondary. */}
@@ -156,7 +154,7 @@ export const ProDetailScreen: React.FC = () => {
               style={styles.ctaButton}
             />
             <Button
-              title="I have a license key"
+              title={t('proDetail.haveLicenseKey')}
               variant="secondary"
               onPress={openVerifyModal}
               style={styles.verifyButton}
@@ -170,16 +168,14 @@ export const ProDetailScreen: React.FC = () => {
           style={styles.desktopRow}
           onPress={openDesktop}
           accessibilityRole="link"
-          accessibilityLabel="Get Off Grid AI Desktop"
+          accessibilityLabel={t('proDetail.getDesktop')}
         >
           <View style={styles.desktopIconWrap}>
             <Icon name="monitor" size={18} color={colors.primary} />
           </View>
           <View style={styles.desktopText}>
-            <Text style={styles.desktopTitle}>Get Off Grid AI Desktop</Text>
-            <Text style={styles.desktopDesc}>
-              Free for your Mac. Run your models there and use them from this phone over your own network.
-            </Text>
+            <Text style={styles.desktopTitle}>{t('proDetail.getDesktop')}</Text>
+            <Text style={styles.desktopDesc}>{t('proDetail.desktopDesc')}</Text>
           </View>
           <Icon name="external-link" size={16} color={colors.textMuted} />
         </TouchableOpacity>

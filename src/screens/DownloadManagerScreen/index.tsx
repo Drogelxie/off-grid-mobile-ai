@@ -71,7 +71,7 @@ export const DownloadManagerScreen: React.FC = () => {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.filterBarContent}
     >
-      {FILTERS.map(f => {
+      {FILTERS.map(f => { const filterLabel = t(`downloadManager.filter_${f.id}`);
         const active = activeFilter === f.id;
         return (
           <TouchableOpacity
@@ -79,7 +79,7 @@ export const DownloadManagerScreen: React.FC = () => {
             style={[styles.filterChip, active && styles.filterChipActive]}
             onPress={() => setActiveFilter(f.id)}
           >
-            <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{f.label}</Text>
+            <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{filterLabel}</Text>
           </TouchableOpacity>
         );
       })}
@@ -105,18 +105,18 @@ export const DownloadManagerScreen: React.FC = () => {
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Icon name="download" size={16} color={colors.primary} />
-                  <Text style={styles.sectionTitle}>Active Downloads</Text>
+                  <Text style={styles.sectionTitle}>{t('downloadManager.activeDownloads')}</Text>
                   <View style={styles.countBadge}>
                     <Text testID="dm-active-downloading-count" style={styles.countText}>{activeDownloadingCount}</Text>
                   </View>
                   {activeQueuedCount > 0 && (
                     <Text testID="dm-active-queued-count" style={[styles.countText, { color: colors.textSecondary }]}>
-                      {activeQueuedCount} queued
+                      {activeQueuedCount} {t('downloadManager.queued')}
                     </Text>
                   )}
                   {activeFailedCount > 0 && (
                     <Text testID="dm-active-failed-count" style={[styles.countText, { color: colors.error ?? colors.textSecondary }]}>
-                      {activeFailedCount} failed
+                      {activeFailedCount} {t('downloadManager.failed')}
                     </Text>
                   )}
                 </View>
@@ -132,7 +132,7 @@ export const DownloadManagerScreen: React.FC = () => {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Icon name="check-circle" size={16} color={colors.success} />
-                <Text style={styles.sectionTitle}>Downloaded Models</Text>
+                <Text style={styles.sectionTitle}>{t('downloadManager.downloadedModels')}</Text>
                 <View style={styles.countBadge}>
                   <Text style={styles.countText}>{filteredCompleted.length}</Text>
                 </View>
@@ -147,7 +147,7 @@ export const DownloadManagerScreen: React.FC = () => {
                 <Card style={styles.emptyCard}>
                   <Icon name="package" size={24} color={colors.textMuted} />
                   <Text style={styles.emptyText}>
-                    {activeFilter === 'all' ? 'No models downloaded yet' : `No ${FILTERS.find(f => f.id === activeFilter)?.label ?? ''} models`}
+                    {activeFilter === 'all' ? t('downloadManager.noModelsDownloaded') : t('downloadManager.noFilteredModels', { filter: t(`downloadManager.filter_${activeFilter}`) })}
                   </Text>
                 </Card>
               )}
